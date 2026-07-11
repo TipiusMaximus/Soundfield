@@ -274,8 +274,8 @@
 </head>
 <body>
   <aside class="panel">
-    <h1>Pressure Field Lab v0.2</h1>
-    <p>Explore low-frequency pressure and phase behavior in simple point-source speaker layouts. Drag sources and the listener, then compare 2.0 versus 2.1 field behavior.</p>
+    <h1>Pressure Field Lab v0.3</h1>
+    <p>Explore low-frequency pressure and phase behavior in simple point-source speaker layouts. Drag sources and the listener, then compare 2.0 versus 2.1 field behavior with a simplified complex crossover and phase modulation.</p>
 
     <div class="section-title">Analysis</div>
     <div class="control-group">
@@ -294,7 +294,16 @@
         <option value="compare">Compare 2.0 vs 2.1</option>
         <option value="difference">Difference</option>
       </select>
-      <small>Compare uses the same frequency, crossover, and field scale for both layouts.</small>
+      <small>Compare uses the same frequency, crossover, modulation settings, and field scale for both layouts.</small>
+    </div>
+
+    <div class="control-group">
+      <label for="comparisonModeSelect">Level matching</label>
+      <select id="comparisonModeSelect">
+        <option value="same-per-cabinet">Same per-cabinet gain</option>
+        <option value="same-total-source-power">Same total source power</option>
+      </select>
+      <small>Use the same gain per cabinet or normalize total active source power for fair 2.0 vs 2.1 comparison.</small>
     </div>
 
     <div class="control-group">
@@ -326,7 +335,14 @@
         <option value="12">12 dB/oct</option>
         <option value="24">24 dB/oct</option>
       </select>
-      <small>Top sources use a high-pass rolloff. Sub sources use a low-pass rolloff. Full range bypasses the crossover.</small>
+    </div>
+    <div class="control-group">
+      <label for="crossoverResponseSelect">Crossover response</label>
+      <select id="crossoverResponseSelect">
+        <option value="lr12">Linkwitz–Riley 12 dB/oct</option>
+        <option value="lr24">Linkwitz–Riley 24 dB/oct</option>
+      </select>
+      <small>Top sources use a high-pass response. Sub sources use a low-pass response. Full range bypasses the crossover and uses unity phase.</small>
     </div>
 
     <div class="section-title">Sources</div>
@@ -355,6 +371,39 @@
     <div class="control-group">
       <label for="bpmRange">BPM <span id="bpmValue">120</span></label>
       <input id="bpmRange" type="range" min="80" max="180" value="120" />
+    </div>
+    <div class="control-group">
+      <label for="gainDepthRange">Gain depth <span id="gainDepthValue">4 dB</span></label>
+      <input id="gainDepthRange" type="range" min="0" max="12" value="4" />
+    </div>
+    <div class="control-group">
+      <label for="delayDepthRange">Delay depth <span id="delayDepthValue">4 ms</span></label>
+      <input id="delayDepthRange" type="range" min="0" max="20" value="4" />
+    </div>
+    <div class="control-group">
+      <label for="phaseDepthRange">Phase depth <span id="phaseDepthValue">45°</span></label>
+      <input id="phaseDepthRange" type="range" min="0" max="180" value="45" />
+    </div>
+    <div class="control-group">
+      <label>Modulation targets</label>
+      <div class="field-row"><label><input id="targetGain" type="checkbox" checked /> Gain</label></div>
+      <div class="field-row"><label><input id="targetDelay" type="checkbox" checked /> Delay</label></div>
+      <div class="field-row"><label><input id="targetPhase" type="checkbox" /> Phase</label></div>
+    </div>
+    <div class="control-group">
+      <label>Quick source selection</label>
+      <div class="button-row">
+        <button id="modulateAllButton" type="button" class="secondary">Modulate all</button>
+        <button id="modulateNoneButton" type="button" class="secondary">Modulate none</button>
+      </div>
+      <div class="button-row">
+        <button id="modulateSubsButton" type="button" class="secondary">Modulate subs</button>
+        <button id="modulateTopsButton" type="button" class="secondary">Modulate tops</button>
+        <button id="modulateFullRangeButton" type="button" class="secondary">Modulate full range</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <small id="durationSummary">16 bars · 32.0 seconds</small>
     </div>
     <div class="button-row">
       <button id="animateButton" type="button">Start animation</button>
@@ -396,6 +445,7 @@
       <div class="info-line"><span>Pointer</span><strong id="pointerPosition">-,-</strong></div>
       <div class="info-line"><span>Field peak</span><strong id="fieldMax">0.00</strong></div>
       <div class="info-line"><span>Listener level</span><strong id="listenerLevel">0.0 dB</strong></div>
+      <div class="info-line"><span>Compare listener</span><strong id="compareListenerValue">-</strong></div>
     </div>
     <div class="info-box">
       <strong>Listener source detail</strong>
@@ -424,6 +474,8 @@
     const crossoverFrequencyRange = document.getElementById('crossoverFrequencyRange');
     const crossoverValue = document.getElementById('crossoverValue');
     const crossoverSlopeSelect = document.getElementById('crossoverSlopeSelect');
+    const crossoverResponseSelect = document.getElementById('crossoverResponseSelect');
+    const comparisonModeSelect = document.getElementById('comparisonModeSelect');
     const sourcesContainer = document.getElementById('sourcesContainer');
     const resetButton = document.getElementById('resetButton');
     const animateButton = document.getElementById('animateButton');
@@ -432,8 +484,23 @@
     const animationModeSelect = document.getElementById('animationModeSelect');
     const modulationDurationRange = document.getElementById('modulationDurationRange');
     const durationValue = document.getElementById('durationValue');
+    const durationSummary = document.getElementById('durationSummary');
     const bpmRange = document.getElementById('bpmRange');
     const bpmValue = document.getElementById('bpmValue');
+    const gainDepthRange = document.getElementById('gainDepthRange');
+    const delayDepthRange = document.getElementById('delayDepthRange');
+    const phaseDepthRange = document.getElementById('phaseDepthRange');
+    const gainDepthValue = document.getElementById('gainDepthValue');
+    const delayDepthValue = document.getElementById('delayDepthValue');
+    const phaseDepthValue = document.getElementById('phaseDepthValue');
+    const targetGain = document.getElementById('targetGain');
+    const targetDelay = document.getElementById('targetDelay');
+    const targetPhase = document.getElementById('targetPhase');
+    const modulateAllButton = document.getElementById('modulateAllButton');
+    const modulateNoneButton = document.getElementById('modulateNoneButton');
+    const modulateSubsButton = document.getElementById('modulateSubsButton');
+    const modulateTopsButton = document.getElementById('modulateTopsButton');
+    const modulateFullRangeButton = document.getElementById('modulateFullRangeButton');
     const activeLayout = document.getElementById('activeLayout');
     const activeAnalysis = document.getElementById('activeAnalysis');
     const activeDisplay = document.getElementById('activeDisplay');
@@ -451,6 +518,7 @@
     const worldSizeLabel = document.getElementById('worldSize');
     const listenerPositionLabel = document.getElementById('listenerPosition');
     const listenerLevelLabel = document.getElementById('listenerLevel');
+    const compareListenerValue = document.getElementById('compareListenerValue');
     const listenerSourceTable = document.getElementById('listenerSourceTable');
 
     canvasSizeLabel.textContent = `${CANVAS_WIDTH} × ${CANVAS_HEIGHT}`;
@@ -458,34 +526,39 @@
 
     const layoutDefaults = {
       '2.0': [
-        { id: 'leftTop', label: 'Left top', type: 'Top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'leftSub', label: 'Left sub', type: 'Sub', x: 8, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rightTop', label: 'Right top', type: 'Top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rightSub', label: 'Right sub', type: 'Sub', x: 22, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'leftTop', label: 'Left top', type: 'Top', x: 8, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'leftSub', label: 'Left sub', type: 'Sub', x: 8, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'rightTop', label: 'Right top', type: 'Top', x: 22, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'rightSub', label: 'Right sub', type: 'Sub', x: 22, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 }
       ],
       '2.1': [
-        { id: 'leftTop', label: 'Left top', type: 'Top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rightTop', label: 'Right top', type: 'Top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'centerSub', label: 'Center sub', type: 'Sub', x: 15, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'leftTop', label: 'Left top', type: 'Top', x: 8, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'rightTop', label: 'Right top', type: 'Top', x: 22, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'centerSubA', label: 'Center sub A', type: 'Sub', x: 15, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'centerSubB', label: 'Center sub B', type: 'Sub', x: 15, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 }
       ],
       '4.0': [
-        { id: 'frontLeft', label: 'Front left', type: 'Full range', x: 6, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontRight', label: 'Front right', type: 'Full range', x: 24, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearLeft', label: 'Rear left', type: 'Full range', x: 6, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearRight', label: 'Rear right', type: 'Full range', x: 24, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'frontLeft', label: 'Front left', type: 'Full range', x: 6, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'frontRight', label: 'Front right', type: 'Full range', x: 24, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'rearLeft', label: 'Rear left', type: 'Full range', x: 6, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'rearRight', label: 'Rear right', type: 'Full range', x: 24, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 }
       ],
       '6.0': [
-        { id: 'frontLeft', label: 'Front left', type: 'Full range', x: 7, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontRight', label: 'Front right', type: 'Full range', x: 23, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontCenterLeft', label: 'Front center left', type: 'Full range', x: 10, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontCenterRight', label: 'Front center right', type: 'Full range', x: 20, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearLeft', label: 'Rear left', type: 'Full range', x: 7, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearRight', label: 'Rear right', type: 'Full range', x: 23, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'frontLeft', label: 'Front left', type: 'Full range', x: 7, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'frontRight', label: 'Front right', type: 'Full range', x: 23, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'frontCenterLeft', label: 'Front center left', type: 'Full range', x: 10, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'frontCenterRight', label: 'Front center right', type: 'Full range', x: 20, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'rearLeft', label: 'Rear left', type: 'Full range', x: 7, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 },
+        { id: 'rearRight', label: 'Rear right', type: 'Full range', x: 23, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1, modulationEnabled: true, phaseOffsetDegrees: 0 }
       ]
     };
 
-    const compareSources20 = layoutDefaults['2.0'].map(src => ({ ...src }));
-    const compareSources21 = layoutDefaults['2.1'].map(src => ({ ...src }));
+    const layoutStates = {
+      '2.0': layoutDefaults['2.0'].map(src => ({ ...src })),
+      '2.1': layoutDefaults['2.1'].map(src => ({ ...src })),
+      '4.0': layoutDefaults['4.0'].map(src => ({ ...src })),
+      '6.0': layoutDefaults['6.0'].map(src => ({ ...src }))
+    };
 
     let sources = [];
     let selectedSource = null;
@@ -493,6 +566,7 @@
     let animate = false;
     let animationStart = performance.now();
     let listener = { x: 15, y: 10 };
+    let currentLayoutName = '2.0';
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
@@ -538,81 +612,147 @@
       return SPEED_OF_SOUND / frequency;
     }
 
-    function getSourceFilterGain(type, frequency) {
-      if (type === 'Full range') return 1;
+    function getComplexCrossoverResponse(type, frequency) {
+      if (type === 'Full range') {
+        return { real: 1, imag: 0, magnitude: 1, phaseRadians: 0 };
+      }
       const cutoff = Number(crossoverFrequencyRange.value);
-      const order = Number(crossoverSlopeSelect.value) / 12;
-      if (frequency <= 0) return 1;
-      if (type === 'Sub') {
-        const ratio = frequency / cutoff;
-        return 1 / Math.sqrt(1 + Math.pow(ratio, 2 * order));
+      const slope = Number(crossoverSlopeSelect.value);
+      const responseMode = crossoverResponseSelect.value;
+      if (frequency <= 0) {
+        return { real: 1, imag: 0, magnitude: 1, phaseRadians: 0 };
       }
-      if (type === 'Top') {
-        const ratio = cutoff / frequency;
-        return 1 / Math.sqrt(1 + Math.pow(ratio, 2 * order));
-      }
-      return 1;
+      const normalized = type === 'Sub' ? frequency / cutoff : cutoff / frequency;
+      const order = responseMode === 'lr24' ? 4 : 2;
+      const magnitude = 1 / Math.sqrt(1 + Math.pow(normalized, 2 * order));
+      const phaseRadians = type === 'Sub' ? -order * Math.atan(normalized) : Math.PI - order * Math.atan(normalized);
+      return {
+        real: magnitude * Math.cos(phaseRadians),
+        imag: magnitude * Math.sin(phaseRadians),
+        magnitude,
+        phaseRadians
+      };
     }
 
-    function getAnimatedValues(source, frequency, elapsedSeconds) {
+    function getModulationTargets() {
+      return {
+        gain: targetGain.checked,
+        delay: targetDelay.checked,
+        phase: targetPhase.checked
+      };
+    }
+
+    function getGainDepth() {
+      return Number(gainDepthRange.value);
+    }
+
+    function getDelayDepth() {
+      return Number(delayDepthRange.value);
+    }
+
+    function getPhaseDepth() {
+      return Number(phaseDepthRange.value);
+    }
+
+    function getAnimationDurationSeconds() {
+      const beatsPerMinute = Number(bpmRange.value);
+      const secondsPerBeat = 60 / beatsPerMinute;
+      const secondsPerBar = secondsPerBeat * 4;
+      return secondsPerBar * Number(modulationDurationRange.value);
+    }
+
+    function getAnimatedValues(source, elapsedSeconds) {
       const mode = animationModeSelect.value;
       let gain = source.gain;
       let delay = source.delay;
-      if (!animate || mode === 'off') {
-        return { gain, delay };
+      let phaseDegrees = source.phaseOffsetDegrees;
+      if (!animate || mode === 'off' || !source.modulationEnabled) {
+        return { gain, delay, phaseDegrees };
       }
 
-      const progress = ((elapsedSeconds / (60 / Number(bpmRange.value))) / Number(modulationDurationRange.value)) % 1;
+      const progress = (elapsedSeconds / getAnimationDurationSeconds()) % 1;
       const sine = Math.sin(progress * Math.PI * 2);
-      const typeFactor = source.type === 'Sub' ? 0.5 : source.type === 'Top' ? 1 : 0.75;
+      const targets = getModulationTargets();
+      let gainDelta = 0;
+      let delayDelta = 0;
+      let phaseDelta = 0;
+
       if (mode === 'breathe') {
-        gain = gain + sine * 4 * typeFactor;
-        delay = delay + Math.sin(progress * Math.PI) * 3;
+        gainDelta = targets.gain ? sine * getGainDepth() : 0;
+        delayDelta = targets.delay ? Math.sin(progress * Math.PI) * getDelayDepth() : 0;
+        phaseDelta = targets.phase ? sine * getPhaseDepth() : 0;
       } else if (mode === 'rotate') {
-        const base = progress * Math.PI * 2 + source.x + source.y;
-        gain = gain + Math.sin(base) * 5;
-        delay = delay + Math.cos(base * 0.7) * 4;
+        const angle = Math.atan2(source.y - WORLD_HEIGHT / 2, source.x - WORLD_WIDTH / 2);
+        const rotationPhase = angle + progress * Math.PI * 2;
+        const wave = Math.sin(rotationPhase);
+        gainDelta = targets.gain ? wave * getGainDepth() : 0;
+        delayDelta = targets.delay ? Math.cos(rotationPhase) * getDelayDepth() : 0;
+        phaseDelta = targets.phase ? wave * getPhaseDepth() : 0;
       } else if (mode === 'focus') {
         const target = selectedSource !== null ? sources[selectedSource] : listener;
         const distance = Math.hypot(target.x - source.x, target.y - source.y);
         const influence = 1 - clamp(distance / Math.hypot(WORLD_WIDTH, WORLD_HEIGHT), 0, 1);
-        gain = gain + influence * 6 * sine;
-        delay = delay + (1 - influence) * 5 * (1 - sine);
+        const wave = sine * influence;
+        gainDelta = targets.gain ? wave * getGainDepth() : 0;
+        delayDelta = targets.delay ? (1 - influence) * getDelayDepth() * (0.5 + 0.5 * Math.sin(progress * Math.PI)) : 0;
+        phaseDelta = targets.phase ? wave * getPhaseDepth() : 0;
       } else if (mode === 'drop') {
         const envelope = Math.min(progress * 1.25, 1);
-        const lockedGain = source.type === 'Sub' ? -2 : 2;
-        const lockedDelay = 0;
-        gain = gain * (1 - envelope) + lockedGain * envelope;
-        delay = delay * (1 - envelope) + lockedDelay * envelope;
+        const build = Math.sin(progress * Math.PI) * (1 - envelope);
+        gainDelta = targets.gain ? build * getGainDepth() : 0;
+        delayDelta = targets.delay ? build * getDelayDepth() : 0;
+        phaseDelta = targets.phase ? build * getPhaseDepth() : 0;
       }
-      return { gain, delay };
+
+      return {
+        gain: gain + gainDelta,
+        delay: delay + delayDelta,
+        phaseDegrees: phaseDegrees + phaseDelta
+      };
     }
 
-    function getSourceContribution(source, worldX, worldY, frequency, elapsedSeconds) {
-      const { gain, delay } = getAnimatedValues(source, frequency, elapsedSeconds);
+    function complexFromPolar(amplitude, phaseRadians) {
+      return {
+        real: amplitude * Math.cos(phaseRadians),
+        imag: amplitude * Math.sin(phaseRadians)
+      };
+    }
+
+    function multiplyComplex(a, b) {
+      return {
+        real: a.real * b.real - a.imag * b.imag,
+        imag: a.real * b.imag + a.imag * b.real
+      };
+    }
+
+    function getSourceContribution(source, worldX, worldY, frequency, elapsedSeconds, normalizationScale = 1) {
+      const { gain, delay, phaseDegrees } = getAnimatedValues(source, elapsedSeconds);
       const dx = worldX - source.x;
       const dy = worldY - source.y;
       const distance = Math.hypot(dx, dy);
       const travelSeconds = distance / SPEED_OF_SOUND;
-      const phase = 2 * Math.PI * frequency * (travelSeconds + delay / 1000);
-      const gainLinear = Math.pow(10, gain / 20);
-      const filterGain = getSourceFilterGain(source.type, frequency);
-      const amplitude = gainLinear * filterGain / Math.max(distance, 0.5);
+      const propagationPhase = 2 * Math.PI * frequency * (travelSeconds + delay / 1000);
+      const gainLinear = Math.pow(10, gain / 20) * normalizationScale;
+      const crossover = getComplexCrossoverResponse(source.type, frequency);
+      const propagation = complexFromPolar(gainLinear / Math.max(distance, 0.5), propagationPhase);
+      const phaseOffsetRadians = phaseDegrees * Math.PI / 180;
+      const manualPhase = complexFromPolar(1, phaseOffsetRadians);
+      const result = multiplyComplex(multiplyComplex(propagation, crossover), manualPhase);
       return {
-        real: source.polarity * amplitude * Math.cos(phase),
-        imag: source.polarity * amplitude * Math.sin(phase),
-        amplitude
+        real: source.polarity * result.real,
+        imag: source.polarity * result.imag,
+        amplitude: Math.max(0, Math.sqrt(result.real * result.real + result.imag * result.imag))
       };
     }
 
-    function getPointMagnitude(sourceList, worldX, worldY, frequencies, elapsedSeconds) {
+    function getPointMagnitude(sourceList, worldX, worldY, frequencies, elapsedSeconds, normalizationScale = 1) {
       let total = 0;
       frequencies.forEach(frequency => {
         let real = 0;
         let imag = 0;
         sourceList.forEach(source => {
           if (!source.enabled) return;
-          const contribution = getSourceContribution(source, worldX, worldY, frequency, elapsedSeconds);
+          const contribution = getSourceContribution(source, worldX, worldY, frequency, elapsedSeconds, normalizationScale);
           real += contribution.real;
           imag += contribution.imag;
         });
@@ -622,7 +762,7 @@
       return Math.sqrt(total / frequencies.length);
     }
 
-    function sampleField(sourceList, frequencies, elapsedSeconds, width = CANVAS_WIDTH) {
+    function sampleField(sourceList, frequencies, elapsedSeconds, width = CANVAS_WIDTH, normalizationScale = 1) {
       const stepX = 18;
       const stepY = 18;
       const values = [];
@@ -631,12 +771,23 @@
       for (let cy = 0; cy <= CANVAS_HEIGHT; cy += stepY) {
         for (let cx = 0; cx <= rightEdge; cx += stepX) {
           const world = canvasToWorldCanvas(cx, cy, width);
-          const value = getPointMagnitude(sourceList, world.x, world.y, frequencies, elapsedSeconds);
+          const value = getPointMagnitude(sourceList, world.x, world.y, frequencies, elapsedSeconds, normalizationScale);
           values.push({ cx, cy, value });
           maxValue = Math.max(maxValue, value);
         }
       }
       return { values, maxValue };
+    }
+
+    function getNormalizationScale(sourceList) {
+      if (comparisonModeSelect.value !== 'same-total-source-power') return 1;
+      const activeSources = sourceList.filter(source => source.enabled);
+      const powerSum = activeSources.reduce((sum, source) => sum + Math.pow(10, source.gain / 20), 0);
+      return powerSum > 0 ? 1 / powerSum : 1;
+    }
+
+    function syncLayoutState() {
+      layoutStates[currentLayoutName] = sources.map(src => ({ ...src }));
     }
 
     function renderSourceControls() {
@@ -649,11 +800,14 @@
           <summary>${source.label} (${source.type})</summary>
           <div class="card-body">
             <div class="field-row"><label><input type="checkbox" data-source="${index}" ${source.enabled ? 'checked' : ''} /> Enabled</label><span>${formatCoords(source)}</span></div>
+            <div class="field-row"><label><input type="checkbox" data-source="${index}" data-modulate="true" ${source.modulationEnabled ? 'checked' : ''} /> Modulate this source</label></div>
             <div class="field-row"><label for="type-${index}">Type</label><select id="type-${index}" data-source="${index}"><option value="Full range">Full range</option><option value="Top">Top</option><option value="Sub">Sub</option></select></div>
             <div class="field-row"><label for="gain-${index}">Gain</label><span id="gainValue-${index}">${source.gain} dB</span></div>
             <input id="gain-${index}" data-source="${index}" type="range" min="-12" max="12" value="${source.gain}" />
             <div class="field-row"><label for="delay-${index}">Delay</label><span id="delayValue-${index}">${source.delay} ms</span></div>
             <input id="delay-${index}" data-source="${index}" type="range" min="0" max="20" value="${source.delay}" />
+            <div class="field-row"><label for="phase-${index}">Phase offset</label><span id="phaseValue-${index}">${source.phaseOffsetDegrees.toFixed(0)}°</span></div>
+            <input id="phase-${index}" data-source="${index}" type="range" min="-180" max="180" value="${source.phaseOffsetDegrees}" />
             <div class="field-row"><label><input type="checkbox" data-source="${index}" data-polarity="true" ${source.polarity > 0 ? 'checked' : ''} /> Normal polarity</label><span>${source.polarity > 0 ? 'normal' : 'inverted'}</span></div>
           </div>
         `;
@@ -665,6 +819,11 @@
         if (input.dataset.polarity) {
           input.addEventListener('change', () => {
             sources[index].polarity = input.checked ? 1 : -1;
+            render();
+          });
+        } else if (input.dataset.modulate) {
+          input.addEventListener('change', () => {
+            sources[index].modulationEnabled = input.checked;
             render();
           });
         } else {
@@ -699,6 +858,13 @@
           input.addEventListener('input', () => {
             sources[index].delay = Number(input.value);
             label.textContent = `${sources[index].delay} ms`;
+            render();
+          });
+        } else if (input.id.startsWith('phase-')) {
+          const label = document.getElementById(`phaseValue-${index}`);
+          input.addEventListener('input', () => {
+            sources[index].phaseOffsetDegrees = Number(input.value);
+            label.textContent = `${sources[index].phaseOffsetDegrees.toFixed(0)}°`;
             render();
           });
         }
@@ -736,6 +902,34 @@
       pointerPosition.textContent = `${world.x.toFixed(1)}, ${world.y.toFixed(1)} m`;
     }
 
+    function drawSourceSymbol(source, x, y, index) {
+      const color = source.enabled ? (source.polarity > 0 ? '#4f46e5' : '#dc2626') : '#94a3b8';
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      const offsetX = source.type === 'Sub' ? 3 : source.type === 'Top' ? -3 : 0;
+      const offsetY = source.type === 'Sub' ? 3 : source.type === 'Top' ? -3 : 0;
+      if (source.type === 'Top') {
+        ctx.beginPath();
+        ctx.moveTo(x + offsetX - 8, y + offsetY + 8);
+        ctx.lineTo(x + offsetX, y + offsetY - 8);
+        ctx.lineTo(x + offsetX + 8, y + offsetY + 8);
+        ctx.closePath();
+      } else if (source.type === 'Sub') {
+        ctx.beginPath();
+        ctx.arc(x + offsetX, y + offsetY, 8, 0, Math.PI * 2);
+      } else {
+        ctx.beginPath();
+        ctx.rect(x + offsetX - 8, y + offsetY - 8, 16, 16);
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(index + 1, x + offsetX, y + offsetY + 4);
+    }
+
     function drawField(values, maxValue, offsetX = 0, width = CANVAS_WIDTH) {
       values.forEach(({ cx, cy, value }) => {
         const intensity = maxValue > 0 ? value / maxValue : 0;
@@ -758,14 +952,8 @@
       });
     }
 
-    function getFieldValues(layoutName, elapsedSeconds, width = CANVAS_WIDTH) {
-      const sourceList = layoutDefaults[layoutName].map(src => ({ ...src, enabled: true }));
-      const frequencies = getActiveFrequencies();
-      return sampleField(sourceList, frequencies, elapsedSeconds, width);
-    }
-
-
     function render() {
+      syncLayoutState();
       const elapsedSeconds = (performance.now() - animationStart) / 1000;
       const frequency = Number(frequencyRange.value);
       const frequencies = getActiveFrequencies();
@@ -776,25 +964,31 @@
       crossoverValue.textContent = crossoverFrequencyRange.value;
       bpmValue.textContent = bpmRange.value;
       durationValue.textContent = modulationDurationRange.value;
-      activeLayout.textContent = layoutSelect.value;
+      gainDepthValue.textContent = `${getGainDepth()} dB`;
+      delayDepthValue.textContent = `${getDelayDepth()} ms`;
+      phaseDepthValue.textContent = `${getPhaseDepth()}°`;
+      durationSummary.textContent = `${modulationDurationRange.value} bars · ${getAnimationDurationSeconds().toFixed(1)} seconds`;
+      activeLayout.textContent = displayMode === 'single' ? currentLayoutName : '2.0 vs 2.1';
       activeAnalysis.textContent = analysisModeSelect.value === 'broadband' ? 'Broadband' : 'Single frequency';
       activeDisplay.textContent = compareLabel;
       activeAnimation.textContent = animationModeSelect.options[animationModeSelect.selectedIndex].text;
       activeFrequency.textContent = getFrequencyLabel();
       wavelengthValue.textContent = `${getWavelength(frequency).toFixed(2)} m`;
       halfWavelengthValue.textContent = `${(getWavelength(frequency) / 2).toFixed(2)} m`;
-      activeCrossover.textContent = `${crossoverFrequencyRange.value} Hz, ${crossoverSlopeSelect.value} dB/oct`;
+      activeCrossover.textContent = `${crossoverFrequencyRange.value} Hz, ${crossoverSlopeSelect.value} dB/oct (${crossoverResponseSelect.value === 'lr24' ? 'Linkwitz-Riley 24' : 'Linkwitz-Riley 12'})`;
       selectedSourceLabel.textContent = selectedSource !== null ? sources[selectedSource].label : 'None';
-
-      const diagnosticsFrequencies = [frequency];
-      fieldScale.textContent = `normalized to peak`; 
+      fieldScale.textContent = comparisonModeSelect.value === 'same-total-source-power' ? 'normalized to total source power' : 'normalized to cabinet gain';
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       const halfWidth = CANVAS_WIDTH / 2;
       let maxPressure = 0;
       if (displayMode === 'compare' || displayMode === 'difference') {
-        const leftData = sampleField(compareSources20, frequencies, elapsedSeconds, halfWidth);
-        const rightData = sampleField(compareSources21, frequencies, elapsedSeconds, halfWidth);
+        const leftSources = layoutStates['2.0'];
+        const rightSources = layoutStates['2.1'];
+        const leftScale = getNormalizationScale(leftSources);
+        const rightScale = getNormalizationScale(rightSources);
+        const leftData = sampleField(leftSources, frequencies, elapsedSeconds, halfWidth, leftScale);
+        const rightData = sampleField(rightSources, frequencies, elapsedSeconds, halfWidth, rightScale);
         const commonMax = Math.max(leftData.maxValue, rightData.maxValue, 1e-6);
         if (displayMode === 'compare') {
           drawField(leftData.values, commonMax, 0);
@@ -804,8 +998,8 @@
           ctx.moveTo(halfWidth, 0);
           ctx.lineTo(halfWidth, CANVAS_HEIGHT);
           ctx.stroke();
-          drawCompareSources(compareSources20, 0, halfWidth);
-          drawCompareSources(compareSources21, halfWidth, halfWidth);
+          drawCompareSources(leftSources, 0, halfWidth);
+          drawCompareSources(rightSources, halfWidth, halfWidth);
           maxPressure = commonMax;
         } else {
           const diff = leftData.values.map((point, index) => ({
@@ -841,18 +1035,7 @@
       if (displayMode === 'single') {
         sources.forEach((source, index) => {
           const pos = worldToCanvas(source);
-          const color = source.enabled ? (source.polarity > 0 ? '#4f46e5' : '#dc2626') : '#94a3b8';
-          ctx.beginPath();
-          ctx.fillStyle = color;
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2;
-          ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 10px system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(index + 1, pos.x, pos.y + 4);
+          drawSourceSymbol(source, pos.x, pos.y, index);
         });
       }
 
@@ -881,7 +1064,8 @@
     }
 
     function setLayout(layoutName) {
-      sources = layoutDefaults[layoutName].map(src => ({ ...src }));
+      currentLayoutName = layoutName;
+      sources = layoutStates[layoutName].map(src => ({ ...src }));
       selectedSource = null;
       sourceCount.textContent = sources.length;
       renderSourceControls();
@@ -893,12 +1077,24 @@
       frequencyRange.value = 80;
       crossoverFrequencyRange.value = 80;
       crossoverSlopeSelect.value = '24';
+      crossoverResponseSelect.value = 'lr24';
+      comparisonModeSelect.value = 'same-per-cabinet';
       modulationDurationRange.value = 16;
       bpmRange.value = 120;
+      gainDepthRange.value = 4;
+      delayDepthRange.value = 4;
+      phaseDepthRange.value = 45;
+      targetGain.checked = true;
+      targetDelay.checked = true;
+      targetPhase.checked = false;
       analysisModeSelect.value = 'single';
       displayModeSelect.value = 'single';
       animationModeSelect.value = 'off';
       listener = { x: 15, y: 10 };
+      layoutStates['2.0'] = layoutDefaults['2.0'].map(src => ({ ...src }));
+      layoutStates['2.1'] = layoutDefaults['2.1'].map(src => ({ ...src }));
+      layoutStates['4.0'] = layoutDefaults['4.0'].map(src => ({ ...src }));
+      layoutStates['6.0'] = layoutDefaults['6.0'].map(src => ({ ...src }));
       setLayout('2.0');
     }
 
@@ -906,6 +1102,15 @@
       const isBroadband = analysisModeSelect.value === 'broadband';
       frequencyRange.disabled = isBroadband;
       frequencyRange.style.opacity = isBroadband ? '0.6' : '1';
+    }
+
+    function applyModulationPreset(preset) {
+      const targetTypes = preset === 'none' ? [] : preset === 'subs' ? ['Sub'] : preset === 'tops' ? ['Top'] : preset === 'full-range' ? ['Full range'] : ['Top', 'Sub', 'Full range'];
+      sources.forEach(source => {
+        source.modulationEnabled = targetTypes.length === 0 ? false : targetTypes.includes(source.type);
+      });
+      renderSourceControls();
+      render();
     }
 
     canvas.addEventListener('pointerdown', evt => {
@@ -955,6 +1160,8 @@
     frequencyRange.addEventListener('input', render);
     crossoverFrequencyRange.addEventListener('input', render);
     crossoverSlopeSelect.addEventListener('change', render);
+    crossoverResponseSelect.addEventListener('change', render);
+    comparisonModeSelect.addEventListener('change', render);
     analysisModeSelect.addEventListener('change', () => {
       updateControlState();
       render();
@@ -963,7 +1170,18 @@
     animationModeSelect.addEventListener('change', render);
     modulationDurationRange.addEventListener('input', render);
     bpmRange.addEventListener('input', render);
+    gainDepthRange.addEventListener('input', render);
+    delayDepthRange.addEventListener('input', render);
+    phaseDepthRange.addEventListener('input', render);
+    targetGain.addEventListener('change', render);
+    targetDelay.addEventListener('change', render);
+    targetPhase.addEventListener('change', render);
     resetButton.addEventListener('click', resetDefaults);
+    modulateAllButton.addEventListener('click', () => applyModulationPreset('all'));
+    modulateNoneButton.addEventListener('click', () => applyModulationPreset('none'));
+    modulateSubsButton.addEventListener('click', () => applyModulationPreset('subs'));
+    modulateTopsButton.addEventListener('click', () => applyModulationPreset('tops'));
+    modulateFullRangeButton.addEventListener('click', () => applyModulationPreset('full-range'));
 
     animateButton.addEventListener('click', () => {
       animate = !animate;
@@ -977,21 +1195,11 @@
     function drawCompareSources(sourceList, offsetX, panelWidth) {
       sourceList.forEach((source, index) => {
         const pos = worldToCanvas(source, panelWidth);
-        ctx.beginPath();
-        ctx.fillStyle = source.enabled ? (source.polarity > 0 ? '#4f46e5' : '#dc2626') : '#94a3b8';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.arc(offsetX + pos.x, pos.y, 10, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(index + 1, offsetX + pos.x, pos.y + 4);
+        drawSourceSymbol(source, offsetX + pos.x, pos.y, index);
       });
     }
 
-    function animateLoop(timestamp) {
+    function animateLoop() {
       if (!animate) return;
       render();
       requestAnimationFrame(animateLoop);
@@ -1000,12 +1208,28 @@
     function renderListenerInfo(elapsedSeconds) {
       listenerPositionLabel.textContent = `${listener.x.toFixed(1)}, ${listener.y.toFixed(1)} m`;
       const frequencies = getActiveFrequencies();
-      const pointValue = getPointMagnitude(sources, listener.x, listener.y, frequencies, elapsedSeconds);
-      const dB = 20 * Math.log10(pointValue + 1e-6);
-      listenerLevelLabel.textContent = `${dB.toFixed(1)} dB`;
+      if (displayModeSelect.value === 'compare' || displayModeSelect.value === 'difference') {
+        const leftSources = layoutStates['2.0'];
+        const rightSources = layoutStates['2.1'];
+        const leftScale = getNormalizationScale(leftSources);
+        const rightScale = getNormalizationScale(rightSources);
+        const leftValue = getPointMagnitude(leftSources, listener.x, listener.y, frequencies, elapsedSeconds, leftScale);
+        const rightValue = getPointMagnitude(rightSources, listener.x, listener.y, frequencies, elapsedSeconds, rightScale);
+        const leftDb = 20 * Math.log10(leftValue + 1e-6);
+        const rightDb = 20 * Math.log10(rightValue + 1e-6);
+        const diffDb = leftDb - rightDb;
+        listenerLevelLabel.textContent = `${leftDb.toFixed(1)} dB`;
+        compareListenerValue.textContent = `2.0 ${leftDb.toFixed(1)} dB · 2.1 ${rightDb.toFixed(1)} dB · diff ${diffDb.toFixed(1)} dB`;
+      } else {
+        const pointValue = getPointMagnitude(sources, listener.x, listener.y, frequencies, elapsedSeconds);
+        const dB = 20 * Math.log10(pointValue + 1e-6);
+        listenerLevelLabel.textContent = `${dB.toFixed(1)} dB`;
+        compareListenerValue.textContent = '-';
+      }
       listenerSourceTable.innerHTML = '';
 
-      sources.forEach(source => {
+      const activeSources = displayModeSelect.value === 'single' ? sources : sources;
+      activeSources.forEach(source => {
         const dx = listener.x - source.x;
         const dy = listener.y - source.y;
         const distance = Math.hypot(dx, dy);
@@ -1018,7 +1242,7 @@
           <td>${source.label}</td>
           <td>${distance.toFixed(1)} m</td>
           <td>${timeMs.toFixed(1)} ms</td>
-          <td>${phase.toFixed(1)} rad</td>
+          <td>${(phase * 180 / Math.PI).toFixed(1)}°</td>
           <td>${level.toFixed(1)} dB</td>
         `;
         listenerSourceTable.appendChild(row);
@@ -1031,6 +1255,17 @@
     }
 
     initialize();
+    window.__soundfieldDebug = () => {
+      const durationSeconds = getAnimationDurationSeconds();
+      console.log('v0.3 debug', {
+        durationSeconds,
+        crossoverResponse: crossoverResponseSelect.value,
+        modulationTargets: getModulationTargets(),
+        compareMode: comparisonModeSelect.value,
+        layout2_0: layoutStates['2.0'],
+        layout2_1: layoutStates['2.1']
+      });
+    };
   </script>
 </body>
 </html>
