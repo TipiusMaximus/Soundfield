@@ -1,141 +1,63 @@
-# Soundfield# Codex prompt: Pressure Field Lab v0.1
+# Pressure Field Lab v0.2
 
-Build a single-file browser app called `Pressure Field Lab v0.1`.
+A lightweight browser-based field lab for low-frequency speaker layout and crossover exploration. This version adds broadband analysis, source types, a simplified crossover model, listener measurement, animation modes, and 2.0 vs 2.1 comparison.
 
-## Goal
+## What it calculates
+- pressure field magnitude from point sources
+- complex summation of real and imaginary pressure components
+- source gain, delay, polarity, type, and enabled state
+- simplified crossover rolloff for Top and Sub sources
+- single-frequency and broadband RMS field values
+- compare maps for 2.0 and 2.1 layouts
+- listener distance, delay, phase, and relative amplitude
 
-Create an interactive 2D pressure-field visualizer for PA/subwoofer layout experiments.
+## What it does not calculate
+- speaker directivity or real radiation patterns
+- cabinet size or physical enclosure effects
+- line-array geometry
+- room reflections or floor reflections
+- air absorption
+- actual speaker phase response
+- amplifier or limiter behavior
 
-This is not meant to be a professional acoustic simulator. It is a fast visual thinking tool for comparing 2.0, 2.1, 4.0 and 6.0 speaker layouts.
+## Running the app
+Open `index.html` directly in a modern browser, or run a simple server from the repository root:
 
-## Hard requirements
-
-- Create one file: `index.html`
-- Use vanilla HTML, CSS and JavaScript only
-- Use Canvas 2D
-- No npm
-- No build step
-- No external libraries
-- Must run by opening `index.html` directly in a browser
-
-## Core features
-
-1. Draw a top-down 2D dancefloor.
-2. Show draggable sound sources.
-3. Layout selector:
-   - 2.0: left top+sub and right top+sub
-   - 2.1: left/right tops and draggable center sub
-   - 4.0: four totem points
-   - 6.0: six surrounding points
-4. Frequency slider: 35–120 Hz.
-5. Heatmap showing summed pressure magnitude.
-6. Each source has:
-   - enabled checkbox
-   - gain dB slider
-   - delay ms slider
-   - polarity toggle
-7. Reset layout button.
-8. Show coordinates and basic info.
-
-## Simulation model
-
-Use a simplified point-source model.
-
-Constants:
-
-```js
-const SPEED_OF_SOUND = 343;
+```bash
+python3 -m http.server 8000
 ```
 
-For each grid pixel/sample point:
+Then open `http://127.0.0.1:8000`.
 
-```text
-distance = distance from source to point in meters
-phase = 2 * PI * frequency * distance / SPEED_OF_SOUND
-phase += 2 * PI * frequency * delaySeconds
-amplitude = gainLinear / Math.max(distance, 0.5)
-pressure += polarity * amplitude * Math.cos(phase)
-```
+## Controls
+- `Analysis mode`: choose `Single frequency` or `Broadband`
+- `Display mode`: choose `Single layout`, `Compare 2.0 vs 2.1`, or `Difference`
+- `Frequency`: 35–200 Hz (single frequency mode)
+- `Crossover frequency`: 60–140 Hz
+- `Filter slope`: 12 dB/oct or 24 dB/oct
+- Source cards: enable/disable, gain, delay, polarity, and source type
+- Listener: drag the green listener point on the canvas
+- Animation: turn on slow modulation, rotate, focus, or drop lock behavior
 
-Display `Math.abs(pressure)` as heatmap intensity.
+## Layouts
+- `2.0`: left/right top and left/right sub
+- `2.1`: left/right top plus center sub
+- `4.0`: four full-range positions
+- `6.0`: six full-range totem positions
 
-## Coordinate system
+## Using 2.0 vs 2.1 comparison
+- Select `Compare 2.0 vs 2.1` to view both maps side by side.
+- Select `Difference` to see red when 2.0 is stronger and blue when 2.1 is stronger.
+- Both comparison modes use the same frequency, crossover, and visual scale.
 
-Use canvas pixels but map to meters.
+## Trying 4.0 and 6.0
+- Switch layout to `4.0` or `6.0` in `Single layout` mode.
+- Use the listener point and source controls to explore field behavior.
 
-Example:
+## Notes
+- Below 160 Hz the model is useful for basic pressure and phase interference.
+- Between 160–200 Hz the model is a transition approximation for sub/top integration.
+- Above 200 Hz the point-source approximation is not reliable and results should be interpreted with caution.
 
-```text
-canvas width = 900 px
-canvas height = 600 px
-world width = 30 m
-world height = 20 m
-```
-
-## Layout defaults
-
-2.0:
-
-```text
-L top/sub: x=8, y=3
-R top/sub: x=22, y=3
-```
-
-2.1:
-
-```text
-L top: x=8, y=3
-R top: x=22, y=3
-center sub: x=15, y=4
-```
-
-4.0:
-
-```text
-front left: x=6, y=4
-front right: x=24, y=4
-rear left: x=6, y=16
-rear right: x=24, y=16
-```
-
-6.0:
-
-```text
-six points around the dancefloor oval/circle
-```
-
-## UI notes
-
-Make it beginner-friendly:
-
-- clear labels
-- short helper text
-- no jargon-only controls
-- responsive enough for laptop screen
-
-## Stretch goals if easy
-
-- Add `Animate` button for slow modulation.
-- Add preset: `breathing field` where gains slowly move between sources.
-- Add preset: `rotating field` for 4.0.
-- Add preset: `drop lock` where sources align toward dancefloor center.
-- Add JSON export/import of source positions and settings.
-
-## Acceptance test
-
-After implementation:
-
-1. Open `index.html` in browser.
-2. Select 2.0 and 80 Hz.
-3. Select 2.1 and 80 Hz.
-4. Drag the center sub and confirm the heatmap updates.
-5. Change delay/gain/polarity and confirm heatmap updates.
-6. Select 4.0 and 6.0 and confirm sources appear correctly.
-
-## Tone of project
-
-The research idea is:
-
-> Embrace the Phase. Compose the Pressure Field.
-
-Keep the code simple and readable so the next iteration can add real measurements later.
+## Next step
+The next small improvement would be to replace the point-source model with measured speaker responses or real acoustic impulse data.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pressure Field Lab v0.1</title>
+  <title>Pressure Field Lab v0.2</title>
   <style>
     :root {
       font-family: system-ui, sans-serif;
@@ -43,15 +43,30 @@
       color: #4a5568;
     }
 
+    .section-title {
+      margin: 24px 0 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
     .control-group {
       margin-bottom: 18px;
     }
 
     .control-group label {
       display: block;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       font-weight: 600;
       color: #222;
+    }
+
+    .control-group small {
+      display: block;
+      margin-top: 6px;
+      color: #64748b;
+      font-size: 0.95rem;
+      line-height: 1.4;
     }
 
     select, input[type="range"], input[type="number"], button {
@@ -66,17 +81,54 @@
       background: #fff;
     }
 
+    input[type="range"] {
+      display: block;
+      appearance: none;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #2563eb 0%, #a5b4fc 100%);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid #2563eb;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    }
+
     .source-card {
       border: 1px solid #d2d6dc;
       border-radius: 14px;
-      padding: 14px;
       margin-bottom: 14px;
       background: #fcfdff;
+      overflow: hidden;
     }
 
-    .source-card h2 {
-      margin: 0 0 10px;
-      font-size: 1rem;
+    .source-card summary {
+      cursor: pointer;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 700;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .source-card summary:hover {
+      background: #eef2ff;
+    }
+
+    .source-card .card-body {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
     }
 
     .field-row {
@@ -84,12 +136,12 @@
       grid-template-columns: auto 1fr;
       gap: 8px 12px;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 4px;
     }
 
     .field-row span,
     .field-row label {
-      font-size: 0.9rem;
+      font-size: 0.95rem;
     }
 
     .field-row input[type="checkbox"] {
@@ -97,16 +149,11 @@
       margin-right: 4px;
     }
 
-    .text-muted {
-      color: #62718b;
-      font-size: 0.9rem;
-    }
-
     .button-row {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      margin-top: 12px;
+      margin-top: 6px;
     }
 
     button {
@@ -134,7 +181,7 @@
       padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
 
     .canvas-wrapper {
@@ -144,12 +191,14 @@
       background: #0f172a;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
       position: relative;
+      touch-action: none;
     }
 
     canvas {
       display: block;
       width: 100%;
       height: 100%;
+      touch-action: none;
     }
 
     .info-box {
@@ -177,6 +226,25 @@
       color: #111827;
     }
 
+    .listener-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.92rem;
+    }
+
+    .listener-table th,
+    .listener-table td {
+      padding: 6px 8px;
+      border: 1px solid #e2e8f0;
+      text-align: left;
+    }
+
+    .listener-table th {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+
     @media (max-width: 1000px) {
       body {
         flex-direction: column;
@@ -192,35 +260,105 @@
         min-height: 520px;
       }
     }
+
+    @media (max-width: 640px) {
+      .panel {
+        min-width: 100%;
+      }
+
+      .button-row {
+        flex-direction: column;
+      }
+    }
   </style>
 </head>
 <body>
   <aside class="panel">
-    <h1>Pressure Field Lab v0.1</h1>
-    <p>Explore simplified low-frequency speaker layouts with draggable sources, delay, gain, and polarity controls. Open <strong>index.html</strong> directly in a browser to run.</p>
+    <h1>Pressure Field Lab v0.2</h1>
+    <p>Explore low-frequency pressure and phase behavior in simple point-source speaker layouts. Drag sources and the listener, then compare 2.0 versus 2.1 field behavior.</p>
+
+    <div class="section-title">Analysis</div>
+    <div class="control-group">
+      <label for="analysisModeSelect">Analysis mode</label>
+      <select id="analysisModeSelect">
+        <option value="single">Single frequency</option>
+        <option value="broadband">Broadband</option>
+      </select>
+      <small>Single frequency shows an exact field snapshot. Broadband shows RMS energy across musical low frequencies.</small>
+    </div>
 
     <div class="control-group">
-      <label for="layoutSelect">Layout</label>
+      <label for="displayModeSelect">Display mode</label>
+      <select id="displayModeSelect">
+        <option value="single">Single layout</option>
+        <option value="compare">Compare 2.0 vs 2.1</option>
+        <option value="difference">Difference</option>
+      </select>
+      <small>Compare uses the same frequency, crossover, and field scale for both layouts.</small>
+    </div>
+
+    <div class="control-group">
+      <label for="frequencyRange">Frequency <span id="frequencyValue">80</span> Hz</label>
+      <input id="frequencyRange" type="range" min="35" max="200" value="80" />
+      <small>35–160 Hz: pressure and phase interference. 160–200 Hz: transition and sub/top integration. >200 Hz is not reliable for this point-source model.</small>
+    </div>
+
+    <div class="section-title">Layout</div>
+    <div class="control-group">
+      <label for="layoutSelect">Speaker layout</label>
       <select id="layoutSelect">
         <option value="2.0">2.0</option>
         <option value="2.1">2.1</option>
         <option value="4.0">4.0</option>
         <option value="6.0">6.0</option>
       </select>
-      <p class="text-muted">Choose a speaker arrangement and reset to restore defaults.</p>
+      <small>2.0 and 2.1 have distinct top/sub organization. 4.0 and 6.0 use full-range positions.</small>
     </div>
 
+    <div class="section-title">Crossover</div>
     <div class="control-group">
-      <label for="frequencyRange">Frequency <span id="frequencyValue">80</span> Hz</label>
-      <input id="frequencyRange" type="range" min="35" max="120" value="80" />
-      <p class="text-muted">Low-frequency pressure fields are computed from a point-source model.</p>
+      <label for="crossoverFrequencyRange">Crossover frequency <span id="crossoverValue">80</span> Hz</label>
+      <input id="crossoverFrequencyRange" type="range" min="60" max="140" value="80" />
+    </div>
+    <div class="control-group">
+      <label for="crossoverSlopeSelect">Filter slope</label>
+      <select id="crossoverSlopeSelect">
+        <option value="12">12 dB/oct</option>
+        <option value="24">24 dB/oct</option>
+      </select>
+      <small>Top sources use a high-pass rolloff. Sub sources use a low-pass rolloff. Full range bypasses the crossover.</small>
     </div>
 
+    <div class="section-title">Sources</div>
     <div class="control-group" id="sourcesContainer"></div>
 
+    <div class="section-title">Listener</div>
+    <div class="control-group">
+      <p>Drag the listener point on the field to explore the local energy and phase at the selected frequency.</p>
+    </div>
+
+    <div class="section-title">Modulation</div>
+    <div class="control-group">
+      <label for="animationModeSelect">Animation mode</label>
+      <select id="animationModeSelect">
+        <option value="off">Off</option>
+        <option value="breathe">Breathe</option>
+        <option value="rotate">Rotate</option>
+        <option value="focus">Focus</option>
+        <option value="drop">Drop Lock</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label for="modulationDurationRange">Modulation duration <span id="durationValue">16</span> bars</label>
+      <input id="modulationDurationRange" type="range" min="4" max="32" value="16" />
+    </div>
+    <div class="control-group">
+      <label for="bpmRange">BPM <span id="bpmValue">120</span></label>
+      <input id="bpmRange" type="range" min="80" max="180" value="120" />
+    </div>
     <div class="button-row">
-      <button id="resetButton" type="button">Reset layout</button>
-      <button id="animateButton" type="button" class="secondary">Animate field</button>
+      <button id="animateButton" type="button">Start animation</button>
+      <button id="resetButton" type="button" class="secondary">Reset defaults</button>
     </div>
 
     <div class="info-box" style="margin-top:18px;">
@@ -230,7 +368,7 @@
         <div class="info-line"><span>Sources</span><strong id="sourceCount">0</strong></div>
         <div class="info-line"><span>Model</span><strong>Point source</strong></div>
       </div>
-      <p class="text-muted" style="margin-top: 10px;">Drag any enabled source directly on the canvas to update the heatmap.</p>
+      <p class="text-muted" style="margin-top: 10px;">Drag enabled sources and the listener directly on the canvas. Touch and mouse both work.</p>
     </div>
   </aside>
 
@@ -239,10 +377,34 @@
       <canvas id="fieldCanvas" width="900" height="600"></canvas>
     </div>
     <div class="info-box">
-      <div class="info-line"><span>Active layout</span><strong id="activeLayout">2.0</strong></div>
+      <div class="info-grid">
+        <div class="info-line"><span>Active layout</span><strong id="activeLayout">2.0</strong></div>
+        <div class="info-line"><span>Analysis mode</span><strong id="activeAnalysis">Single</strong></div>
+        <div class="info-line"><span>Display mode</span><strong id="activeDisplay">Single layout</strong></div>
+        <div class="info-line"><span>Animation mode</span><strong id="activeAnimation">Off</strong></div>
+        <div class="info-line"><span>Frequency</span><strong id="activeFrequency">80 Hz</strong></div>
+        <div class="info-line"><span>Wavelength</span><strong id="wavelengthValue">4.3 m</strong></div>
+        <div class="info-line"><span>Half wavelength</span><strong id="halfWavelengthValue">2.1 m</strong></div>
+        <div class="info-line"><span>Crossover</span><strong id="activeCrossover">80 Hz, 24 dB/oct</strong></div>
+        <div class="info-line"><span>Field scale</span><strong id="fieldScale">normalized</strong></div>
+      </div>
+      <p class="text-muted" style="margin-top: 10px;">Compare values are calculated on a shared color range. Difference mode shows red when 2.0 is stronger and blue when 2.1 is stronger.</p>
+    </div>
+    <div class="info-box">
       <div class="info-line"><span>Selected source</span><strong id="selectedSource">None</strong></div>
-      <div class="info-line"><span>Pointer position</span><strong id="pointerPosition">-,-</strong></div>
-      <div class="info-line"><span>Field max</span><strong id="fieldMax">0.00</strong></div>
+      <div class="info-line"><span>Listener</span><strong id="listenerPosition">15.0, 10.0 m</strong></div>
+      <div class="info-line"><span>Pointer</span><strong id="pointerPosition">-,-</strong></div>
+      <div class="info-line"><span>Field peak</span><strong id="fieldMax">0.00</strong></div>
+      <div class="info-line"><span>Listener level</span><strong id="listenerLevel">0.0 dB</strong></div>
+    </div>
+    <div class="info-box">
+      <strong>Listener source detail</strong>
+      <table class="listener-table">
+        <thead>
+          <tr><th>Source</th><th>Dist</th><th>Time</th><th>Phase</th><th>Level</th></tr>
+        </thead>
+        <tbody id="listenerSourceTable"></tbody>
+      </table>
     </div>
   </section>
 
@@ -252,98 +414,248 @@
     const WORLD_HEIGHT = 20;
     const CANVAS_WIDTH = 900;
     const CANVAS_HEIGHT = 600;
+    const BROADBAND_FREQUENCIES = [50, 56, 63, 71, 80, 90, 100, 112, 125, 140, 160];
+
     const canvas = document.getElementById('fieldCanvas');
     const ctx = canvas.getContext('2d');
     const layoutSelect = document.getElementById('layoutSelect');
     const frequencyRange = document.getElementById('frequencyRange');
     const frequencyValue = document.getElementById('frequencyValue');
+    const crossoverFrequencyRange = document.getElementById('crossoverFrequencyRange');
+    const crossoverValue = document.getElementById('crossoverValue');
+    const crossoverSlopeSelect = document.getElementById('crossoverSlopeSelect');
+    const sourcesContainer = document.getElementById('sourcesContainer');
     const resetButton = document.getElementById('resetButton');
     const animateButton = document.getElementById('animateButton');
-    const sourcesContainer = document.getElementById('sourcesContainer');
+    const analysisModeSelect = document.getElementById('analysisModeSelect');
+    const displayModeSelect = document.getElementById('displayModeSelect');
+    const animationModeSelect = document.getElementById('animationModeSelect');
+    const modulationDurationRange = document.getElementById('modulationDurationRange');
+    const durationValue = document.getElementById('durationValue');
+    const bpmRange = document.getElementById('bpmRange');
+    const bpmValue = document.getElementById('bpmValue');
     const activeLayout = document.getElementById('activeLayout');
+    const activeAnalysis = document.getElementById('activeAnalysis');
+    const activeDisplay = document.getElementById('activeDisplay');
+    const activeAnimation = document.getElementById('activeAnimation');
+    const activeFrequency = document.getElementById('activeFrequency');
+    const wavelengthValue = document.getElementById('wavelengthValue');
+    const halfWavelengthValue = document.getElementById('halfWavelengthValue');
+    const activeCrossover = document.getElementById('activeCrossover');
+    const fieldScale = document.getElementById('fieldScale');
     const selectedSourceLabel = document.getElementById('selectedSource');
     const pointerPosition = document.getElementById('pointerPosition');
     const fieldMaxLabel = document.getElementById('fieldMax');
     const sourceCount = document.getElementById('sourceCount');
     const canvasSizeLabel = document.getElementById('canvasSize');
     const worldSizeLabel = document.getElementById('worldSize');
+    const listenerPositionLabel = document.getElementById('listenerPosition');
+    const listenerLevelLabel = document.getElementById('listenerLevel');
+    const listenerSourceTable = document.getElementById('listenerSourceTable');
 
     canvasSizeLabel.textContent = `${CANVAS_WIDTH} × ${CANVAS_HEIGHT}`;
     worldSizeLabel.textContent = `${WORLD_WIDTH} m × ${WORLD_HEIGHT} m`;
 
     const layoutDefaults = {
       '2.0': [
-        { id: 'leftTop', label: 'Left top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'leftSub', label: 'Left sub', x: 8, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rightTop', label: 'Right top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rightSub', label: 'Right sub', x: 22, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'leftTop', label: 'Left top', type: 'Top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'leftSub', label: 'Left sub', type: 'Sub', x: 8, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rightTop', label: 'Right top', type: 'Top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rightSub', label: 'Right sub', type: 'Sub', x: 22, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 }
       ],
       '2.1': [
-        { id: 'leftTop', label: 'Left top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rightTop', label: 'Right top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'centerSub', label: 'Center sub', x: 15, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'leftTop', label: 'Left top', type: 'Top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rightTop', label: 'Right top', type: 'Top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'centerSub', label: 'Center sub', type: 'Sub', x: 15, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 }
       ],
       '4.0': [
-        { id: 'frontLeft', label: 'Front left', x: 6, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontRight', label: 'Front right', x: 24, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearLeft', label: 'Rear left', x: 6, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearRight', label: 'Rear right', x: 24, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'frontLeft', label: 'Front left', type: 'Full range', x: 6, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontRight', label: 'Front right', type: 'Full range', x: 24, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearLeft', label: 'Rear left', type: 'Full range', x: 6, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearRight', label: 'Rear right', type: 'Full range', x: 24, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
       ],
       '6.0': [
-        { id: 'frontLeft', label: 'Front left', x: 7, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontRight', label: 'Front right', x: 23, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontCenterLeft', label: 'Front center left', x: 10, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'frontCenterRight', label: 'Front center right', x: 20, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearLeft', label: 'Rear left', x: 7, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
-        { id: 'rearRight', label: 'Rear right', x: 23, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
+        { id: 'frontLeft', label: 'Front left', type: 'Full range', x: 7, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontRight', label: 'Front right', type: 'Full range', x: 23, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontCenterLeft', label: 'Front center left', type: 'Full range', x: 10, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontCenterRight', label: 'Front center right', type: 'Full range', x: 20, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearLeft', label: 'Rear left', type: 'Full range', x: 7, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearRight', label: 'Rear right', type: 'Full range', x: 23, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
       ]
     };
 
+    const compareSources20 = layoutDefaults['2.0'].map(src => ({ ...src }));
+    const compareSources21 = layoutDefaults['2.1'].map(src => ({ ...src }));
+
     let sources = [];
     let selectedSource = null;
-    let pointer = { x: 0, y: 0 };
+    let dragTarget = null;
     let animate = false;
     let animationStart = performance.now();
+    let listener = { x: 15, y: 10 };
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
     }
 
-    function worldToCanvas(x, y) {
+    function worldToCanvas(point, width = CANVAS_WIDTH) {
       return {
-        x: (x / WORLD_WIDTH) * CANVAS_WIDTH,
-        y: (y / WORLD_HEIGHT) * CANVAS_HEIGHT
+        x: (point.x / WORLD_WIDTH) * width,
+        y: (point.y / WORLD_HEIGHT) * CANVAS_HEIGHT
       };
     }
 
-    function canvasToWorld(x, y) {
+    function canvasToWorldCanvas(canvasX, canvasY, canvasWidth = CANVAS_WIDTH) {
       return {
-        x: clamp((x / CANVAS_WIDTH) * WORLD_WIDTH, 0, WORLD_WIDTH),
-        y: clamp((y / CANVAS_HEIGHT) * WORLD_HEIGHT, 0, WORLD_HEIGHT)
+        x: clamp((canvasX / canvasWidth) * WORLD_WIDTH, 0, WORLD_WIDTH),
+        y: clamp((canvasY / CANVAS_HEIGHT) * WORLD_HEIGHT, 0, WORLD_HEIGHT)
       };
     }
 
-    function setLayout(layoutName) {
-      sources = layoutDefaults[layoutName].map(src => ({ ...src }));
-      activeLayout.textContent = layoutName;
-      sourceCount.textContent = sources.length;
-      renderSourceControls();
-      render();
+    function clientToCanvas(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = CANVAS_WIDTH / rect.width;
+      const scaleY = CANVAS_HEIGHT / rect.height;
+      return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+      };
+    }
+
+    function getActiveFrequencies() {
+      return analysisModeSelect.value === 'broadband'
+        ? BROADBAND_FREQUENCIES
+        : [Number(frequencyRange.value)];
+    }
+
+    function getFrequencyLabel() {
+      return analysisModeSelect.value === 'broadband'
+        ? 'broadband'
+        : `${frequencyRange.value} Hz`;
+    }
+
+    function getWavelength(frequency) {
+      return SPEED_OF_SOUND / frequency;
+    }
+
+    function getSourceFilterGain(type, frequency) {
+      if (type === 'Full range') return 1;
+      const cutoff = Number(crossoverFrequencyRange.value);
+      const order = Number(crossoverSlopeSelect.value) / 12;
+      if (frequency <= 0) return 1;
+      if (type === 'Sub') {
+        const ratio = frequency / cutoff;
+        return 1 / Math.sqrt(1 + Math.pow(ratio, 2 * order));
+      }
+      if (type === 'Top') {
+        const ratio = cutoff / frequency;
+        return 1 / Math.sqrt(1 + Math.pow(ratio, 2 * order));
+      }
+      return 1;
+    }
+
+    function getAnimatedValues(source, frequency, elapsedSeconds) {
+      const mode = animationModeSelect.value;
+      let gain = source.gain;
+      let delay = source.delay;
+      if (!animate || mode === 'off') {
+        return { gain, delay };
+      }
+
+      const progress = ((elapsedSeconds / (60 / Number(bpmRange.value))) / Number(modulationDurationRange.value)) % 1;
+      const sine = Math.sin(progress * Math.PI * 2);
+      const typeFactor = source.type === 'Sub' ? 0.5 : source.type === 'Top' ? 1 : 0.75;
+      if (mode === 'breathe') {
+        gain = gain + sine * 4 * typeFactor;
+        delay = delay + Math.sin(progress * Math.PI) * 3;
+      } else if (mode === 'rotate') {
+        const base = progress * Math.PI * 2 + source.x + source.y;
+        gain = gain + Math.sin(base) * 5;
+        delay = delay + Math.cos(base * 0.7) * 4;
+      } else if (mode === 'focus') {
+        const target = selectedSource !== null ? sources[selectedSource] : listener;
+        const distance = Math.hypot(target.x - source.x, target.y - source.y);
+        const influence = 1 - clamp(distance / Math.hypot(WORLD_WIDTH, WORLD_HEIGHT), 0, 1);
+        gain = gain + influence * 6 * sine;
+        delay = delay + (1 - influence) * 5 * (1 - sine);
+      } else if (mode === 'drop') {
+        const envelope = Math.min(progress * 1.25, 1);
+        const lockedGain = source.type === 'Sub' ? -2 : 2;
+        const lockedDelay = 0;
+        gain = gain * (1 - envelope) + lockedGain * envelope;
+        delay = delay * (1 - envelope) + lockedDelay * envelope;
+      }
+      return { gain, delay };
+    }
+
+    function getSourceContribution(source, worldX, worldY, frequency, elapsedSeconds) {
+      const { gain, delay } = getAnimatedValues(source, frequency, elapsedSeconds);
+      const dx = worldX - source.x;
+      const dy = worldY - source.y;
+      const distance = Math.hypot(dx, dy);
+      const travelSeconds = distance / SPEED_OF_SOUND;
+      const phase = 2 * Math.PI * frequency * (travelSeconds + delay / 1000);
+      const gainLinear = Math.pow(10, gain / 20);
+      const filterGain = getSourceFilterGain(source.type, frequency);
+      const amplitude = gainLinear * filterGain / Math.max(distance, 0.5);
+      return {
+        real: source.polarity * amplitude * Math.cos(phase),
+        imag: source.polarity * amplitude * Math.sin(phase),
+        amplitude
+      };
+    }
+
+    function getPointMagnitude(sourceList, worldX, worldY, frequencies, elapsedSeconds) {
+      let total = 0;
+      frequencies.forEach(frequency => {
+        let real = 0;
+        let imag = 0;
+        sourceList.forEach(source => {
+          if (!source.enabled) return;
+          const contribution = getSourceContribution(source, worldX, worldY, frequency, elapsedSeconds);
+          real += contribution.real;
+          imag += contribution.imag;
+        });
+        const magnitude = Math.sqrt(real * real + imag * imag);
+        total += magnitude * magnitude;
+      });
+      return Math.sqrt(total / frequencies.length);
+    }
+
+    function sampleField(sourceList, frequencies, elapsedSeconds, width = CANVAS_WIDTH) {
+      const stepX = 18;
+      const stepY = 18;
+      const values = [];
+      let maxValue = 0;
+      const rightEdge = width;
+      for (let cy = 0; cy <= CANVAS_HEIGHT; cy += stepY) {
+        for (let cx = 0; cx <= rightEdge; cx += stepX) {
+          const world = canvasToWorldCanvas(cx, cy, width);
+          const value = getPointMagnitude(sourceList, world.x, world.y, frequencies, elapsedSeconds);
+          values.push({ cx, cy, value });
+          maxValue = Math.max(maxValue, value);
+        }
+      }
+      return { values, maxValue };
     }
 
     function renderSourceControls() {
       sourcesContainer.innerHTML = '';
       sources.forEach((source, index) => {
-        const card = document.createElement('div');
+        const card = document.createElement('details');
         card.className = 'source-card';
+        card.open = true;
         card.innerHTML = `
-          <h2>${source.label}</h2>
-          <div class="field-row"><label><input type="checkbox" data-source="${index}" ${source.enabled ? 'checked' : ''} /> Enabled</label><span>${formatCoords(source)}</span></div>
-          <div class="field-row"><label for="gain-${index}">Gain</label><span id="gainValue-${index}">${source.gain} dB</span></div>
-          <input id="gain-${index}" data-source="${index}" type="range" min="-12" max="12" value="${source.gain}" />
-          <div class="field-row"><label for="delay-${index}">Delay</label><span id="delayValue-${index}">${source.delay} ms</span></div>
-          <input id="delay-${index}" data-source="${index}" type="range" min="0" max="20" value="${source.delay}" />
-          <div class="field-row"><label><input type="checkbox" data-source="${index}" data-polarity="true" ${source.polarity > 0 ? 'checked' : ''} /> Polarity</label><span>${source.polarity > 0 ? 'normal' : 'inverted'}</span></div>
+          <summary>${source.label} (${source.type})</summary>
+          <div class="card-body">
+            <div class="field-row"><label><input type="checkbox" data-source="${index}" ${source.enabled ? 'checked' : ''} /> Enabled</label><span>${formatCoords(source)}</span></div>
+            <div class="field-row"><label for="type-${index}">Type</label><select id="type-${index}" data-source="${index}"><option value="Full range">Full range</option><option value="Top">Top</option><option value="Sub">Sub</option></select></div>
+            <div class="field-row"><label for="gain-${index}">Gain</label><span id="gainValue-${index}">${source.gain} dB</span></div>
+            <input id="gain-${index}" data-source="${index}" type="range" min="-12" max="12" value="${source.gain}" />
+            <div class="field-row"><label for="delay-${index}">Delay</label><span id="delayValue-${index}">${source.delay} ms</span></div>
+            <input id="delay-${index}" data-source="${index}" type="range" min="0" max="20" value="${source.delay}" />
+            <div class="field-row"><label><input type="checkbox" data-source="${index}" data-polarity="true" ${source.polarity > 0 ? 'checked' : ''} /> Normal polarity</label><span>${source.polarity > 0 ? 'normal' : 'inverted'}</span></div>
+          </div>
         `;
         sourcesContainer.appendChild(card);
       });
@@ -361,6 +673,16 @@
             render();
           });
         }
+      });
+
+      sourcesContainer.querySelectorAll('select').forEach(select => {
+        const index = Number(select.dataset.source);
+        select.value = sources[index].type;
+        select.addEventListener('change', () => {
+          sources[index].type = select.value;
+          render();
+          renderSourceControls();
+        });
       });
 
       sourcesContainer.querySelectorAll('input[type="range"]').forEach(input => {
@@ -387,185 +709,325 @@
       return `(${source.x.toFixed(1)}, ${source.y.toFixed(1)}) m`;
     }
 
-    function getPressureAt(worldX, worldY, frequency) {
-      let pressure = 0;
-      const omega = 2 * Math.PI * frequency;
-      sources.forEach(src => {
-        if (!src.enabled) return;
-        const dx = worldX - src.x;
-        const dy = worldY - src.y;
-        const distance = Math.hypot(dx, dy);
-        const phase = omega * (distance / SPEED_OF_SOUND + src.delay / 1000);
-        const gainLinear = Math.pow(10, src.gain / 20);
-        const amplitude = gainLinear / Math.max(distance, 0.5);
-        pressure += src.polarity * amplitude * Math.cos(phase);
+    function updateSourceControlPositions() {
+      sourcesContainer.querySelectorAll('.source-card').forEach((card, idx) => {
+        const span = card.querySelector('.field-row span');
+        if (span) {
+          span.textContent = formatCoords(sources[idx]);
+        }
       });
-      return pressure;
     }
 
-    function render() {
-      const frequency = Number(frequencyRange.value);
-      frequencyValue.textContent = frequency;
-      activeLayout.textContent = layoutSelect.value;
-      selectedSourceLabel.textContent = selectedSource ? sources[selectedSource].label : 'None';
+    function isPointNearSource(canvasX, canvasY) {
+      return sources.findIndex(source => {
+        const pos = worldToCanvas(source);
+        return Math.hypot(canvasX - pos.x, canvasY - pos.y) < 18;
+      });
+    }
 
-      const sampleStepX = 15;
-      const sampleStepY = 15;
-      const values = [];
-      let maxPressure = 0;
-      for (let cy = 0; cy <= CANVAS_HEIGHT; cy += sampleStepY) {
-        for (let cx = 0; cx <= CANVAS_WIDTH; cx += sampleStepX) {
-          const world = canvasToWorld(cx, cy);
-          const pressure = Math.abs(getPressureAt(world.x, world.y, frequency));
-          values.push({ cx, cy, pressure });
-          maxPressure = Math.max(maxPressure, pressure);
-        }
-      }
+    function isPointNearListener(canvasX, canvasY) {
+      const pos = worldToCanvas(listener);
+      return Math.hypot(canvasX - pos.x, canvasY - pos.y) < 18;
+    }
+
+    function updatePointerLabel(evt) {
+      const canvasPoint = clientToCanvas(evt);
+      const world = canvasToWorldCanvas(canvasPoint.x, canvasPoint.y);
+      pointerPosition.textContent = `${world.x.toFixed(1)}, ${world.y.toFixed(1)} m`;
+    }
+
+    function drawField(values, maxValue, offsetX = 0, width = CANVAS_WIDTH) {
+      values.forEach(({ cx, cy, value }) => {
+        const intensity = maxValue > 0 ? value / maxValue : 0;
+        const hue = 240 - intensity * 240;
+        const alpha = clamp(Math.pow(intensity, 0.7), 0.08, 0.85);
+        ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+        ctx.fillRect(offsetX + cx - 9, cy - 9, 18, 18);
+      });
+    }
+
+    function drawDifference(values, maxAbs) {
+      values.forEach(({ cx, cy, value }) => {
+        const normalized = maxAbs > 0 ? value / maxAbs : 0;
+        const clamped = clamp(normalized, -1, 1);
+        const hue = clamped >= 0 ? 0 : 220;
+        const intensity = Math.abs(clamped);
+        const alpha = clamp(intensity * 0.8 + 0.1, 0.08, 0.9);
+        ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+        ctx.fillRect(cx - 9, cy - 9, 18, 18);
+      });
+    }
+
+    function getFieldValues(layoutName, elapsedSeconds, width = CANVAS_WIDTH) {
+      const sourceList = layoutDefaults[layoutName].map(src => ({ ...src, enabled: true }));
+      const frequencies = getActiveFrequencies();
+      return sampleField(sourceList, frequencies, elapsedSeconds, width);
+    }
+
+
+    function render() {
+      const elapsedSeconds = (performance.now() - animationStart) / 1000;
+      const frequency = Number(frequencyRange.value);
+      const frequencies = getActiveFrequencies();
+      const displayMode = displayModeSelect.value;
+      const compareLabel = displayMode === 'compare' ? 'Compare 2.0 vs 2.1' : displayMode === 'difference' ? 'Difference' : 'Single layout';
+
+      frequencyValue.textContent = frequency;
+      crossoverValue.textContent = crossoverFrequencyRange.value;
+      bpmValue.textContent = bpmRange.value;
+      durationValue.textContent = modulationDurationRange.value;
+      activeLayout.textContent = layoutSelect.value;
+      activeAnalysis.textContent = analysisModeSelect.value === 'broadband' ? 'Broadband' : 'Single frequency';
+      activeDisplay.textContent = compareLabel;
+      activeAnimation.textContent = animationModeSelect.options[animationModeSelect.selectedIndex].text;
+      activeFrequency.textContent = getFrequencyLabel();
+      wavelengthValue.textContent = `${getWavelength(frequency).toFixed(2)} m`;
+      halfWavelengthValue.textContent = `${(getWavelength(frequency) / 2).toFixed(2)} m`;
+      activeCrossover.textContent = `${crossoverFrequencyRange.value} Hz, ${crossoverSlopeSelect.value} dB/oct`;
+      selectedSourceLabel.textContent = selectedSource !== null ? sources[selectedSource].label : 'None';
+
+      const diagnosticsFrequencies = [frequency];
+      fieldScale.textContent = `normalized to peak`; 
 
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      if (maxPressure > 0) {
-        values.forEach(({ cx, cy, pressure }) => {
-          const intensity = pressure / maxPressure;
-          const hue = 240 - intensity * 240;
-          const alpha = clamp(Math.pow(intensity, 0.7), 0.08, 0.9);
-          ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
-          ctx.fillRect(cx - sampleStepX / 2, cy - sampleStepY / 2, sampleStepX, sampleStepY);
-        });
+      const halfWidth = CANVAS_WIDTH / 2;
+      let maxPressure = 0;
+      if (displayMode === 'compare' || displayMode === 'difference') {
+        const leftData = sampleField(compareSources20, frequencies, elapsedSeconds, halfWidth);
+        const rightData = sampleField(compareSources21, frequencies, elapsedSeconds, halfWidth);
+        const commonMax = Math.max(leftData.maxValue, rightData.maxValue, 1e-6);
+        if (displayMode === 'compare') {
+          drawField(leftData.values, commonMax, 0);
+          drawField(rightData.values, commonMax, halfWidth);
+          ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+          ctx.beginPath();
+          ctx.moveTo(halfWidth, 0);
+          ctx.lineTo(halfWidth, CANVAS_HEIGHT);
+          ctx.stroke();
+          drawCompareSources(compareSources20, 0, halfWidth);
+          drawCompareSources(compareSources21, halfWidth, halfWidth);
+          maxPressure = commonMax;
+        } else {
+          const diff = leftData.values.map((point, index) => ({
+            cx: point.cx,
+            cy: point.cy,
+            value: point.value - rightData.values[index].value
+          }));
+          const maxAbs = Math.max(...diff.map(p => Math.abs(p.value)), 1e-6);
+          drawDifference(diff, maxAbs);
+          maxPressure = maxAbs;
+        }
+      } else {
+        const fieldData = sampleField(sources, frequencies, elapsedSeconds, CANVAS_WIDTH);
+        drawField(fieldData.values, fieldData.maxValue);
+        maxPressure = fieldData.maxValue;
       }
 
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.lineWidth = 1;
-      for (let x = 0; x <= CANVAS_WIDTH; x += sampleStepX) {
+      for (let x = 0; x <= CANVAS_WIDTH; x += 18) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, CANVAS_HEIGHT);
         ctx.stroke();
       }
-      for (let y = 0; y <= CANVAS_HEIGHT; y += sampleStepY) {
+      for (let y = 0; y <= CANVAS_HEIGHT; y += 18) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(CANVAS_WIDTH, y);
         ctx.stroke();
       }
 
-      sources.forEach((source, index) => {
-        const { x, y } = worldToCanvas(source.x, source.y);
-        const color = source.enabled ? (source.polarity > 0 ? '#4f46e5' : '#dc2626') : '#94a3b8';
-        ctx.beginPath();
-        ctx.fillStyle = color;
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.arc(x, y, 10, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(index + 1, x, y + 4);
-      });
+      if (displayMode === 'single') {
+        sources.forEach((source, index) => {
+          const pos = worldToCanvas(source);
+          const color = source.enabled ? (source.polarity > 0 ? '#4f46e5' : '#dc2626') : '#94a3b8';
+          ctx.beginPath();
+          ctx.fillStyle = color;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(index + 1, pos.x, pos.y + 4);
+        });
+      }
 
+      const listenerPos = worldToCanvas(listener);
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(16,185,129,0.92)';
+      ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
+      ctx.arc(listenerPos.x, listenerPos.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('L', listenerPos.x, listenerPos.y + 4);
+
       ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.stroke();
 
       fieldMaxLabel.textContent = maxPressure.toFixed(2);
       updateSourceControlPositions();
+      renderListenerInfo(elapsedSeconds);
     }
 
-    function updateSourceControlPositions() {
-      sourcesContainer.querySelectorAll('.source-card').forEach((card, idx) => {
-        const line = card.querySelector('.field-row span');
-        if (line) {
-          line.textContent = formatCoords(sources[idx]);
-        }
-      });
-    }
-
-    function updateLayoutSelection() {
+    function setLayout(layoutName) {
+      sources = layoutDefaults[layoutName].map(src => ({ ...src }));
+      selectedSource = null;
+      sourceCount.textContent = sources.length;
       renderSourceControls();
       render();
     }
 
-    function isPointNearSource(mouseX, mouseY) {
-      return sources.findIndex(source => {
-        const pos = worldToCanvas(source.x, source.y);
-        return Math.hypot(mouseX - pos.x, mouseY - pos.y) < 16;
-      });
+    function resetDefaults() {
+      layoutSelect.value = '2.0';
+      frequencyRange.value = 80;
+      crossoverFrequencyRange.value = 80;
+      crossoverSlopeSelect.value = '24';
+      modulationDurationRange.value = 16;
+      bpmRange.value = 120;
+      analysisModeSelect.value = 'single';
+      displayModeSelect.value = 'single';
+      animationModeSelect.value = 'off';
+      listener = { x: 15, y: 10 };
+      setLayout('2.0');
     }
 
-    let dragIndex = null;
-    let dragging = false;
-
-    function setPointerLabel(evt) {
-      const rect = canvas.getBoundingClientRect();
-      const x = evt.clientX - rect.left;
-      const y = evt.clientY - rect.top;
-      const world = canvasToWorld(x, y);
-      pointerPosition.textContent = `${world.x.toFixed(1)}, ${world.y.toFixed(1)} m`;
+    function updateControlState() {
+      const isBroadband = analysisModeSelect.value === 'broadband';
+      frequencyRange.disabled = isBroadband;
+      frequencyRange.style.opacity = isBroadband ? '0.6' : '1';
     }
 
-    canvas.addEventListener('mousedown', evt => {
-      const rect = canvas.getBoundingClientRect();
-      const x = evt.clientX - rect.left;
-      const y = evt.clientY - rect.top;
-      const index = isPointNearSource(x, y);
-      if (index !== -1) {
-        dragIndex = index;
-        dragging = true;
-        selectedSource = index;
-        selectedSourceLabel.textContent = sources[index].label;
+    canvas.addEventListener('pointerdown', evt => {
+      if (evt.pointerType === 'mouse' && evt.button !== 0) return;
+      const point = clientToCanvas(evt);
+      const sourceIndex = isPointNearSource(point.x, point.y);
+      if (sourceIndex !== -1) {
+        dragTarget = { type: 'source', index: sourceIndex };
+        selectedSource = sourceIndex;
+        selectedSourceLabel.textContent = sources[sourceIndex].label;
+      } else if (isPointNearListener(point.x, point.y)) {
+        dragTarget = { type: 'listener' };
+      } else {
+        dragTarget = null;
       }
+      canvas.setPointerCapture(evt.pointerId);
+      updatePointerLabel(evt);
     });
 
-    window.addEventListener('mousemove', evt => {
-      const rect = canvas.getBoundingClientRect();
-      const x = evt.clientX - rect.left;
-      const y = evt.clientY - rect.top;
-      setPointerLabel(evt);
-      if (dragging && dragIndex !== null) {
-        const world = canvasToWorld(x, y);
-        sources[dragIndex].x = world.x;
-        sources[dragIndex].y = world.y;
+    canvas.addEventListener('pointermove', evt => {
+      const point = clientToCanvas(evt);
+      updatePointerLabel(evt);
+      if (!dragTarget) return;
+      const world = canvasToWorldCanvas(point.x, point.y);
+      if (dragTarget.type === 'source') {
+        const source = sources[dragTarget.index];
+        source.x = world.x;
+        source.y = world.y;
+        render();
+      } else if (dragTarget.type === 'listener') {
+        listener.x = world.x;
+        listener.y = world.y;
         render();
       }
     });
 
-    window.addEventListener('mouseup', () => {
-      dragging = false;
-      dragIndex = null;
+    canvas.addEventListener('pointerup', evt => {
+      dragTarget = null;
+      canvas.releasePointerCapture(evt.pointerId);
     });
 
-    frequencyRange.addEventListener('input', () => render());
+    canvas.addEventListener('pointercancel', () => {
+      dragTarget = null;
+    });
+
     layoutSelect.addEventListener('change', () => setLayout(layoutSelect.value));
-    resetButton.addEventListener('click', () => setLayout(layoutSelect.value));
+    frequencyRange.addEventListener('input', render);
+    crossoverFrequencyRange.addEventListener('input', render);
+    crossoverSlopeSelect.addEventListener('change', render);
+    analysisModeSelect.addEventListener('change', () => {
+      updateControlState();
+      render();
+    });
+    displayModeSelect.addEventListener('change', render);
+    animationModeSelect.addEventListener('change', render);
+    modulationDurationRange.addEventListener('input', render);
+    bpmRange.addEventListener('input', render);
+    resetButton.addEventListener('click', resetDefaults);
 
     animateButton.addEventListener('click', () => {
       animate = !animate;
-      animateButton.textContent = animate ? 'Stop animate' : 'Animate field';
+      animateButton.textContent = animate ? 'Stop animation' : 'Start animation';
       if (animate) {
         animationStart = performance.now();
         requestAnimationFrame(animateLoop);
       }
     });
 
+    function drawCompareSources(sourceList, offsetX, panelWidth) {
+      sourceList.forEach((source, index) => {
+        const pos = worldToCanvas(source, panelWidth);
+        ctx.beginPath();
+        ctx.fillStyle = source.enabled ? (source.polarity > 0 ? '#4f46e5' : '#dc2626') : '#94a3b8';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.arc(offsetX + pos.x, pos.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(index + 1, offsetX + pos.x, pos.y + 4);
+      });
+    }
+
     function animateLoop(timestamp) {
       if (!animate) return;
-      const elapsed = (timestamp - animationStart) / 1000;
-      sources.forEach((source, index) => {
-        if (source.id.includes('left')) source.gain = Math.sin(elapsed + index) * 6;
-        if (source.id.includes('right')) source.gain = Math.cos(elapsed + index) * 6;
-        if (source.id.includes('rear')) source.delay = 5 + Math.sin(elapsed + index * 0.5) * 4;
-      });
-      renderSourceControls();
       render();
       requestAnimationFrame(animateLoop);
     }
 
+    function renderListenerInfo(elapsedSeconds) {
+      listenerPositionLabel.textContent = `${listener.x.toFixed(1)}, ${listener.y.toFixed(1)} m`;
+      const frequencies = getActiveFrequencies();
+      const pointValue = getPointMagnitude(sources, listener.x, listener.y, frequencies, elapsedSeconds);
+      const dB = 20 * Math.log10(pointValue + 1e-6);
+      listenerLevelLabel.textContent = `${dB.toFixed(1)} dB`;
+      listenerSourceTable.innerHTML = '';
+
+      sources.forEach(source => {
+        const dx = listener.x - source.x;
+        const dy = listener.y - source.y;
+        const distance = Math.hypot(dx, dy);
+        const timeMs = (distance / SPEED_OF_SOUND) * 1000;
+        const phase = (2 * Math.PI * Number(frequencyRange.value) * (distance / SPEED_OF_SOUND + source.delay / 1000)) % (2 * Math.PI);
+        const contribution = getSourceContribution(source, listener.x, listener.y, Number(frequencyRange.value), elapsedSeconds);
+        const level = 20 * Math.log10(contribution.amplitude + 1e-6);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${source.label}</td>
+          <td>${distance.toFixed(1)} m</td>
+          <td>${timeMs.toFixed(1)} ms</td>
+          <td>${phase.toFixed(1)} rad</td>
+          <td>${level.toFixed(1)} dB</td>
+        `;
+        listenerSourceTable.appendChild(row);
+      });
+    }
+
     function initialize() {
-      layoutSelect.value = '2.0';
-      setLayout('2.0');
+      resetDefaults();
+      updateControlState();
     }
 
     initialize();
