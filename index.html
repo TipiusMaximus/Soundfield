@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pressure Field Lab v0.1</title>
+  <style>
+    :root {
+      font-family: system-ui, sans-serif;
+      color: #111;
+      background: #f4f6f8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+      align-items: stretch;
+      background: #e8ecf0;
+    }
+
+    .panel {
+      width: 360px;
+      min-width: 320px;
+      padding: 20px;
+      background: #fff;
+      border-right: 1px solid #d9dde2;
+      overflow-y: auto;
+    }
+
+    .panel h1 {
+      margin-top: 0;
+      font-size: 1.6rem;
+    }
+
+    .panel p {
+      margin: 0.75rem 0;
+      line-height: 1.5;
+      color: #4a5568;
+    }
+
+    .control-group {
+      margin-bottom: 18px;
+    }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #222;
+    }
+
+    select, input[type="range"], input[type="number"], button {
+      width: 100%;
+      font: inherit;
+    }
+
+    select, input[type="number"] {
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .source-card {
+      border: 1px solid #d2d6dc;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: #fcfdff;
+    }
+
+    .source-card h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .field-row span,
+    .field-row label {
+      font-size: 0.9rem;
+    }
+
+    .field-row input[type="checkbox"] {
+      transform: scale(1.1);
+      margin-right: 4px;
+    }
+
+    .text-muted {
+      color: #62718b;
+      font-size: 0.9rem;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: #1d4ed8;
+    }
+
+    button.secondary {
+      background: #f1f5f9;
+      color: #1f2937;
+    }
+
+    .canvas-shell {
+      flex: 1;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .canvas-wrapper {
+      flex: 1;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #0f172a;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .info-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid #d1d5db;
+      color: #1f2937;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .info-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.95rem;
+    }
+
+    .info-line strong {
+      color: #111827;
+    }
+
+    @media (max-width: 1000px) {
+      body {
+        flex-direction: column;
+      }
+
+      .panel {
+        width: auto;
+        border-right: none;
+        border-bottom: 1px solid #d9dde2;
+      }
+
+      .canvas-shell {
+        min-height: 520px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside class="panel">
+    <h1>Pressure Field Lab v0.1</h1>
+    <p>Explore simplified low-frequency speaker layouts with draggable sources, delay, gain, and polarity controls. Open <strong>index.html</strong> directly in a browser to run.</p>
+
+    <div class="control-group">
+      <label for="layoutSelect">Layout</label>
+      <select id="layoutSelect">
+        <option value="2.0">2.0</option>
+        <option value="2.1">2.1</option>
+        <option value="4.0">4.0</option>
+        <option value="6.0">6.0</option>
+      </select>
+      <p class="text-muted">Choose a speaker arrangement and reset to restore defaults.</p>
+    </div>
+
+    <div class="control-group">
+      <label for="frequencyRange">Frequency <span id="frequencyValue">80</span> Hz</label>
+      <input id="frequencyRange" type="range" min="35" max="120" value="80" />
+      <p class="text-muted">Low-frequency pressure fields are computed from a point-source model.</p>
+    </div>
+
+    <div class="control-group" id="sourcesContainer"></div>
+
+    <div class="button-row">
+      <button id="resetButton" type="button">Reset layout</button>
+      <button id="animateButton" type="button" class="secondary">Animate field</button>
+    </div>
+
+    <div class="info-box" style="margin-top:18px;">
+      <div class="info-grid">
+        <div class="info-line"><span>World size</span><strong id="worldSize">30 m × 20 m</strong></div>
+        <div class="info-line"><span>Canvas</span><strong id="canvasSize">900 × 600</strong></div>
+        <div class="info-line"><span>Sources</span><strong id="sourceCount">0</strong></div>
+        <div class="info-line"><span>Model</span><strong>Point source</strong></div>
+      </div>
+      <p class="text-muted" style="margin-top: 10px;">Drag any enabled source directly on the canvas to update the heatmap.</p>
+    </div>
+  </aside>
+
+  <section class="canvas-shell">
+    <div class="canvas-wrapper">
+      <canvas id="fieldCanvas" width="900" height="600"></canvas>
+    </div>
+    <div class="info-box">
+      <div class="info-line"><span>Active layout</span><strong id="activeLayout">2.0</strong></div>
+      <div class="info-line"><span>Selected source</span><strong id="selectedSource">None</strong></div>
+      <div class="info-line"><span>Pointer position</span><strong id="pointerPosition">-,-</strong></div>
+      <div class="info-line"><span>Field max</span><strong id="fieldMax">0.00</strong></div>
+    </div>
+  </section>
+
+  <script>
+    const SPEED_OF_SOUND = 343;
+    const WORLD_WIDTH = 30;
+    const WORLD_HEIGHT = 20;
+    const CANVAS_WIDTH = 900;
+    const CANVAS_HEIGHT = 600;
+    const canvas = document.getElementById('fieldCanvas');
+    const ctx = canvas.getContext('2d');
+    const layoutSelect = document.getElementById('layoutSelect');
+    const frequencyRange = document.getElementById('frequencyRange');
+    const frequencyValue = document.getElementById('frequencyValue');
+    const resetButton = document.getElementById('resetButton');
+    const animateButton = document.getElementById('animateButton');
+    const sourcesContainer = document.getElementById('sourcesContainer');
+    const activeLayout = document.getElementById('activeLayout');
+    const selectedSourceLabel = document.getElementById('selectedSource');
+    const pointerPosition = document.getElementById('pointerPosition');
+    const fieldMaxLabel = document.getElementById('fieldMax');
+    const sourceCount = document.getElementById('sourceCount');
+    const canvasSizeLabel = document.getElementById('canvasSize');
+    const worldSizeLabel = document.getElementById('worldSize');
+
+    canvasSizeLabel.textContent = `${CANVAS_WIDTH} × ${CANVAS_HEIGHT}`;
+    worldSizeLabel.textContent = `${WORLD_WIDTH} m × ${WORLD_HEIGHT} m`;
+
+    const layoutDefaults = {
+      '2.0': [
+        { id: 'leftTop', label: 'Left top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'leftSub', label: 'Left sub', x: 8, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rightTop', label: 'Right top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rightSub', label: 'Right sub', x: 22, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 }
+      ],
+      '2.1': [
+        { id: 'leftTop', label: 'Left top', x: 8, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rightTop', label: 'Right top', x: 22, y: 3, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'centerSub', label: 'Center sub', x: 15, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 }
+      ],
+      '4.0': [
+        { id: 'frontLeft', label: 'Front left', x: 6, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontRight', label: 'Front right', x: 24, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearLeft', label: 'Rear left', x: 6, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearRight', label: 'Rear right', x: 24, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
+      ],
+      '6.0': [
+        { id: 'frontLeft', label: 'Front left', x: 7, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontRight', label: 'Front right', x: 23, y: 4, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontCenterLeft', label: 'Front center left', x: 10, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'frontCenterRight', label: 'Front center right', x: 20, y: 5.5, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearLeft', label: 'Rear left', x: 7, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 },
+        { id: 'rearRight', label: 'Rear right', x: 23, y: 16, enabled: true, gain: 0, delay: 0, polarity: 1 }
+      ]
+    };
+
+    let sources = [];
+    let selectedSource = null;
+    let pointer = { x: 0, y: 0 };
+    let animate = false;
+    let animationStart = performance.now();
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function worldToCanvas(x, y) {
+      return {
+        x: (x / WORLD_WIDTH) * CANVAS_WIDTH,
+        y: (y / WORLD_HEIGHT) * CANVAS_HEIGHT
+      };
+    }
+
+    function canvasToWorld(x, y) {
+      return {
+        x: clamp((x / CANVAS_WIDTH) * WORLD_WIDTH, 0, WORLD_WIDTH),
+        y: clamp((y / CANVAS_HEIGHT) * WORLD_HEIGHT, 0, WORLD_HEIGHT)
+      };
+    }
+
+    function setLayout(layoutName) {
+      sources = layoutDefaults[layoutName].map(src => ({ ...src }));
+      activeLayout.textContent = layoutName;
+      sourceCount.textContent = sources.length;
+      renderSourceControls();
+      render();
+    }
+
+    function renderSourceControls() {
+      sourcesContainer.innerHTML = '';
+      sources.forEach((source, index) => {
+        const card = document.createElement('div');
+        card.className = 'source-card';
+        card.innerHTML = `
+          <h2>${source.label}</h2>
+          <div class="field-row"><label><input type="checkbox" data-source="${index}" ${source.enabled ? 'checked' : ''} /> Enabled</label><span>${formatCoords(source)}</span></div>
+          <div class="field-row"><label for="gain-${index}">Gain</label><span id="gainValue-${index}">${source.gain} dB</span></div>
+          <input id="gain-${index}" data-source="${index}" type="range" min="-12" max="12" value="${source.gain}" />
+          <div class="field-row"><label for="delay-${index}">Delay</label><span id="delayValue-${index}">${source.delay} ms</span></div>
+          <input id="delay-${index}" data-source="${index}" type="range" min="0" max="20" value="${source.delay}" />
+          <div class="field-row"><label><input type="checkbox" data-source="${index}" data-polarity="true" ${source.polarity > 0 ? 'checked' : ''} /> Polarity</label><span>${source.polarity > 0 ? 'normal' : 'inverted'}</span></div>
+        `;
+        sourcesContainer.appendChild(card);
+      });
+
+      sourcesContainer.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        const index = Number(input.dataset.source);
+        if (input.dataset.polarity) {
+          input.addEventListener('change', () => {
+            sources[index].polarity = input.checked ? 1 : -1;
+            render();
+          });
+        } else {
+          input.addEventListener('change', () => {
+            sources[index].enabled = input.checked;
+            render();
+          });
+        }
+      });
+
+      sourcesContainer.querySelectorAll('input[type="range"]').forEach(input => {
+        const index = Number(input.dataset.source);
+        if (input.id.startsWith('gain-')) {
+          const label = document.getElementById(`gainValue-${index}`);
+          input.addEventListener('input', () => {
+            sources[index].gain = Number(input.value);
+            label.textContent = `${sources[index].gain} dB`;
+            render();
+          });
+        } else if (input.id.startsWith('delay-')) {
+          const label = document.getElementById(`delayValue-${index}`);
+          input.addEventListener('input', () => {
+            sources[index].delay = Number(input.value);
+            label.textContent = `${sources[index].delay} ms`;
+            render();
+          });
+        }
+      });
+    }
+
+    function formatCoords(source) {
+      return `(${source.x.toFixed(1)}, ${source.y.toFixed(1)}) m`;
+    }
+
+    function getPressureAt(worldX, worldY, frequency) {
+      let pressure = 0;
+      const omega = 2 * Math.PI * frequency;
+      sources.forEach(src => {
+        if (!src.enabled) return;
+        const dx = worldX - src.x;
+        const dy = worldY - src.y;
+        const distance = Math.hypot(dx, dy);
+        const phase = omega * (distance / SPEED_OF_SOUND + src.delay / 1000);
+        const gainLinear = Math.pow(10, src.gain / 20);
+        const amplitude = gainLinear / Math.max(distance, 0.5);
+        pressure += src.polarity * amplitude * Math.cos(phase);
+      });
+      return pressure;
+    }
+
+    function render() {
+      const frequency = Number(frequencyRange.value);
+      frequencyValue.textContent = frequency;
+      activeLayout.textContent = layoutSelect.value;
+      selectedSourceLabel.textContent = selectedSource ? sources[selectedSource].label : 'None';
+
+      const sampleStepX = 15;
+      const sampleStepY = 15;
+      const values = [];
+      let maxPressure = 0;
+      for (let cy = 0; cy <= CANVAS_HEIGHT; cy += sampleStepY) {
+        for (let cx = 0; cx <= CANVAS_WIDTH; cx += sampleStepX) {
+          const world = canvasToWorld(cx, cy);
+          const pressure = Math.abs(getPressureAt(world.x, world.y, frequency));
+          values.push({ cx, cy, pressure });
+          maxPressure = Math.max(maxPressure, pressure);
+        }
+      }
+
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      if (maxPressure > 0) {
+        values.forEach(({ cx, cy, pressure }) => {
+          const intensity = pressure / maxPressure;
+          const hue = 240 - intensity * 240;
+          const alpha = clamp(Math.pow(intensity, 0.7), 0.08, 0.9);
+          ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+          ctx.fillRect(cx - sampleStepX / 2, cy - sampleStepY / 2, sampleStepX, sampleStepY);
+        });
+      }
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= CANVAS_WIDTH; x += sampleStepX) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, CANVAS_HEIGHT);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= CANVAS_HEIGHT; y += sampleStepY) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(CANVAS_WIDTH, y);
+        ctx.stroke();
+      }
+
+      sources.forEach((source, index) => {
+        const { x, y } = worldToCanvas(source.x, source.y);
+        const color = source.enabled ? (source.polarity > 0 ? '#4f46e5' : '#dc2626') : '#94a3b8';
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(index + 1, x, y + 4);
+      });
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath();
+      ctx.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.stroke();
+
+      fieldMaxLabel.textContent = maxPressure.toFixed(2);
+      updateSourceControlPositions();
+    }
+
+    function updateSourceControlPositions() {
+      sourcesContainer.querySelectorAll('.source-card').forEach((card, idx) => {
+        const line = card.querySelector('.field-row span');
+        if (line) {
+          line.textContent = formatCoords(sources[idx]);
+        }
+      });
+    }
+
+    function updateLayoutSelection() {
+      renderSourceControls();
+      render();
+    }
+
+    function isPointNearSource(mouseX, mouseY) {
+      return sources.findIndex(source => {
+        const pos = worldToCanvas(source.x, source.y);
+        return Math.hypot(mouseX - pos.x, mouseY - pos.y) < 16;
+      });
+    }
+
+    let dragIndex = null;
+    let dragging = false;
+
+    function setPointerLabel(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      const world = canvasToWorld(x, y);
+      pointerPosition.textContent = `${world.x.toFixed(1)}, ${world.y.toFixed(1)} m`;
+    }
+
+    canvas.addEventListener('mousedown', evt => {
+      const rect = canvas.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      const index = isPointNearSource(x, y);
+      if (index !== -1) {
+        dragIndex = index;
+        dragging = true;
+        selectedSource = index;
+        selectedSourceLabel.textContent = sources[index].label;
+      }
+    });
+
+    window.addEventListener('mousemove', evt => {
+      const rect = canvas.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      setPointerLabel(evt);
+      if (dragging && dragIndex !== null) {
+        const world = canvasToWorld(x, y);
+        sources[dragIndex].x = world.x;
+        sources[dragIndex].y = world.y;
+        render();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      dragging = false;
+      dragIndex = null;
+    });
+
+    frequencyRange.addEventListener('input', () => render());
+    layoutSelect.addEventListener('change', () => setLayout(layoutSelect.value));
+    resetButton.addEventListener('click', () => setLayout(layoutSelect.value));
+
+    animateButton.addEventListener('click', () => {
+      animate = !animate;
+      animateButton.textContent = animate ? 'Stop animate' : 'Animate field';
+      if (animate) {
+        animationStart = performance.now();
+        requestAnimationFrame(animateLoop);
+      }
+    });
+
+    function animateLoop(timestamp) {
+      if (!animate) return;
+      const elapsed = (timestamp - animationStart) / 1000;
+      sources.forEach((source, index) => {
+        if (source.id.includes('left')) source.gain = Math.sin(elapsed + index) * 6;
+        if (source.id.includes('right')) source.gain = Math.cos(elapsed + index) * 6;
+        if (source.id.includes('rear')) source.delay = 5 + Math.sin(elapsed + index * 0.5) * 4;
+      });
+      renderSourceControls();
+      render();
+      requestAnimationFrame(animateLoop);
+    }
+
+    function initialize() {
+      layoutSelect.value = '2.0';
+      setLayout('2.0');
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
