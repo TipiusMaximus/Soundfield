@@ -330,17 +330,10 @@
       <input id="crossoverFrequencyRange" type="range" min="60" max="140" value="80" />
     </div>
     <div class="control-group">
-      <label for="crossoverSlopeSelect">Filter slope</label>
-      <select id="crossoverSlopeSelect">
-        <option value="12">12 dB/oct</option>
-        <option value="24">24 dB/oct</option>
-      </select>
-    </div>
-    <div class="control-group">
       <label for="crossoverResponseSelect">Crossover response</label>
       <select id="crossoverResponseSelect">
         <option value="lr12">Linkwitz–Riley 12 dB/oct</option>
-        <option value="lr24">Linkwitz–Riley 24 dB/oct</option>
+        <option value="lr24" selected>Linkwitz–Riley 24 dB/oct</option>
       </select>
       <small>Top sources use a high-pass response. Sub sources use a low-pass response. Full range bypasses the crossover and uses unity phase.</small>
     </div>
@@ -434,7 +427,7 @@
         <div class="info-line"><span>Frequency</span><strong id="activeFrequency">80 Hz</strong></div>
         <div class="info-line"><span>Wavelength</span><strong id="wavelengthValue">4.3 m</strong></div>
         <div class="info-line"><span>Half wavelength</span><strong id="halfWavelengthValue">2.1 m</strong></div>
-        <div class="info-line"><span>Crossover</span><strong id="activeCrossover">80 Hz, 24 dB/oct</strong></div>
+        <div class="info-line"><span>Crossover</span><strong id="activeCrossover">80 Hz · Linkwitz–Riley 24 dB/oct</strong></div>
         <div class="info-line"><span>Field scale</span><strong id="fieldScale">normalized</strong></div>
       </div>
       <p class="text-muted" style="margin-top: 10px;">Compare values are calculated on a shared color range. Difference mode shows red when 2.0 is stronger and blue when 2.1 is stronger.</p>
@@ -451,7 +444,7 @@
       <strong>Listener source detail</strong>
       <table class="listener-table">
         <thead>
-          <tr><th>Source</th><th>Dist</th><th>Time</th><th>Phase</th><th>Level</th></tr>
+          <tr><th>Layout</th><th>Source</th><th>Type</th><th>Dist</th><th>Travel</th><th>Prop</th><th>Xover</th><th>Base</th><th>Anim</th><th>Effective</th><th>Level</th></tr>
         </thead>
         <tbody id="listenerSourceTable"></tbody>
       </table>
@@ -473,7 +466,6 @@
     const frequencyValue = document.getElementById('frequencyValue');
     const crossoverFrequencyRange = document.getElementById('crossoverFrequencyRange');
     const crossoverValue = document.getElementById('crossoverValue');
-    const crossoverSlopeSelect = document.getElementById('crossoverSlopeSelect');
     const crossoverResponseSelect = document.getElementById('crossoverResponseSelect');
     const comparisonModeSelect = document.getElementById('comparisonModeSelect');
     const sourcesContainer = document.getElementById('sourcesContainer');
@@ -609,34 +601,105 @@
     }
 
     function getActiveFrequency() {
-      return analysisModeSelect.value === 'broadband'
-        ? BROADBAND_FREQUENCIES[0]
-        : Number(frequencyRange.value);
+      return Number(frequencyRange.value);
     }
 
     function getWavelength(frequency) {
       return SPEED_OF_SOUND / frequency;
     }
 
+    function addComplex(a, b) {
+      return { real: a.real + b.real, imag: a.imag + b.imag };
+    }
+
+    function subtractComplex(a, b) {
+      return { real: a.real - b.real, imag: a.imag - b.imag };
+    }
+
+    function multiplyComplex(a, b) {
+      return {
+        real: a.real * b.real - a.imag * b.imag,
+        imag: a.real * b.imag + a.imag * b.real
+      };
+    }
+
+    function divideComplex(a, b) {
+      const denominator = b.real * b.real + b.imag * b.imag;
+      return {
+        real: (a.real * b.real + a.imag * b.imag) / denominator,
+        imag: (a.imag * b.real - a.real * b.imag) / denominator
+      };
+    }
+
+    function scaleComplex(a, scalar) {
+      return { real: a.real * scalar, imag: a.imag * scalar };
+    }
+
+    function squareComplex(a) {
+      return multiplyComplex(a, a);
+    }
+
+    function powComplex(a, exponent) {
+      if (exponent === 0) {
+        return { real: 1, imag: 0 };
+      }
+      const magnitude = Math.pow(magnitudeComplex(a), exponent);
+      const phase = phaseComplex(a) * exponent;
+      return { real: magnitude * Math.cos(phase), imag: magnitude * Math.sin(phase) };
+    }
+
+    function magnitudeComplex(a) {
+      return Math.hypot(a.real, a.imag);
+    }
+
+    function phaseComplex(a) {
+      return Math.atan2(a.imag, a.real);
+    }
+
     function getComplexCrossoverResponse(type, frequency) {
       if (type === 'Full range') {
-        return { real: 1, imag: 0, magnitude: 1, phaseRadians: 0 };
+        return { real: 1, imag: 0, magnitude: 1, phaseRadians: 0, phaseDegrees: 0 };
       }
       const cutoff = Number(crossoverFrequencyRange.value);
-      const slope = Number(crossoverSlopeSelect.value);
       const responseMode = crossoverResponseSelect.value;
       if (frequency <= 0) {
-        return { real: 1, imag: 0, magnitude: 1, phaseRadians: 0 };
+        return { real: 1, imag: 0, magnitude: 1, phaseRadians: 0, phaseDegrees: 0 };
       }
-      const normalized = type === 'Sub' ? frequency / cutoff : cutoff / frequency;
-      const order = responseMode === 'lr24' ? 4 : 2;
-      const magnitude = 1 / Math.sqrt(1 + Math.pow(normalized, 2 * order));
-      const phaseRadians = type === 'Sub' ? -order * Math.atan(normalized) : Math.PI - order * Math.atan(normalized);
+
+      const omega = frequency / cutoff;
+      const s = { real: 0, imag: omega };
+
+      if (responseMode === 'lr12') {
+        // LR12 requires one branch polarity compensation for flat acoustic summation.
+        // This compensation belongs to the crossover model and is separate from the
+        // user-controlled source polarity switch.
+        const denominator = squareComplex(addComplex({ real: 1, imag: 0 }, s));
+        const lowPass = divideComplex({ real: 1, imag: 0 }, denominator);
+        const highPass = divideComplex(squareComplex(s), denominator);
+        const compensatedHighPass = scaleComplex(highPass, -1);
+        const response = type === 'Sub' ? lowPass : compensatedHighPass;
+        const radians = phaseComplex(response);
+        return {
+          real: response.real,
+          imag: response.imag,
+          magnitude: magnitudeComplex(response),
+          phaseRadians: radians,
+          phaseDegrees: radians * 180 / Math.PI
+        };
+      }
+
+      const denominator = addComplex(addComplex(squareComplex(s), scaleComplex(s, Math.sqrt(2))), { real: 1, imag: 0 });
+      const denominatorSquared = squareComplex(denominator);
+      const lowPass = divideComplex({ real: 1, imag: 0 }, denominatorSquared);
+      const highPass = divideComplex(powComplex(s, 4), denominatorSquared);
+      const response = type === 'Sub' ? lowPass : highPass;
+      const radians = phaseComplex(response);
       return {
-        real: magnitude * Math.cos(phaseRadians),
-        imag: magnitude * Math.sin(phaseRadians),
-        magnitude,
-        phaseRadians
+        real: response.real,
+        imag: response.imag,
+        magnitude: magnitudeComplex(response),
+        phaseRadians: radians,
+        phaseDegrees: radians * 180 / Math.PI
       };
     }
 
@@ -724,13 +787,6 @@
       };
     }
 
-    function multiplyComplex(a, b) {
-      return {
-        real: a.real * b.real - a.imag * b.imag,
-        imag: a.real * b.imag + a.imag * b.real
-      };
-    }
-
     function getSourceContribution(source, worldX, worldY, frequency, elapsedSeconds, normalizationScale = 1) {
       const { gain, delay, phaseDegrees } = getAnimatedValues(source, elapsedSeconds);
       const dx = worldX - source.x;
@@ -788,7 +844,10 @@
     function getNormalizationScale(sourceList) {
       if (comparisonModeSelect.value !== 'same-total-source-power') return 1;
       const activeSources = sourceList.filter(source => source.enabled);
-      const powerSum = activeSources.reduce((sum, source) => sum + Math.pow(10, source.gain / 20), 0);
+      const powerSum = activeSources.reduce((sum, source) => {
+        const amplitude = Math.pow(10, source.gain / 20);
+        return sum + amplitude * amplitude;
+      }, 0);
       return powerSum > 0 ? 1 / powerSum : 1;
     }
 
@@ -890,9 +949,19 @@
       });
     }
 
+    function getSourceSymbolPosition(source, width = CANVAS_WIDTH) {
+      const base = worldToCanvas(source, width);
+      const offsetX = source.type === 'Top' ? -6 : source.type === 'Sub' ? 6 : 0;
+      const offsetY = source.type === 'Top' ? -6 : source.type === 'Sub' ? 6 : 0;
+      return {
+        x: base.x + offsetX,
+        y: base.y + offsetY
+      };
+    }
+
     function isPointNearSource(canvasX, canvasY) {
       return sources.findIndex(source => {
-        const pos = worldToCanvas(source);
+        const pos = getSourceSymbolPosition(source);
         return Math.hypot(canvasX - pos.x, canvasY - pos.y) < 18;
       });
     }
@@ -913,27 +982,25 @@
       ctx.fillStyle = color;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
-      const offsetX = source.type === 'Sub' ? 3 : source.type === 'Top' ? -3 : 0;
-      const offsetY = source.type === 'Sub' ? 3 : source.type === 'Top' ? -3 : 0;
       if (source.type === 'Top') {
         ctx.beginPath();
-        ctx.moveTo(x + offsetX - 8, y + offsetY + 8);
-        ctx.lineTo(x + offsetX, y + offsetY - 8);
-        ctx.lineTo(x + offsetX + 8, y + offsetY + 8);
+        ctx.moveTo(x - 8, y + 8);
+        ctx.lineTo(x, y - 8);
+        ctx.lineTo(x + 8, y + 8);
         ctx.closePath();
       } else if (source.type === 'Sub') {
         ctx.beginPath();
-        ctx.arc(x + offsetX, y + offsetY, 8, 0, Math.PI * 2);
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
       } else {
         ctx.beginPath();
-        ctx.rect(x + offsetX - 8, y + offsetY - 8, 16, 16);
+        ctx.rect(x - 8, y - 8, 16, 16);
       }
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 10px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(index + 1, x + offsetX, y + offsetY + 4);
+      ctx.fillText(index + 1, x, y + 4);
     }
 
     function drawField(values, maxValue, offsetX = 0, width = CANVAS_WIDTH) {
@@ -981,7 +1048,7 @@
       activeFrequency.textContent = getFrequencyLabel();
       wavelengthValue.textContent = `${getWavelength(frequency).toFixed(2)} m`;
       halfWavelengthValue.textContent = `${(getWavelength(frequency) / 2).toFixed(2)} m`;
-      activeCrossover.textContent = `${crossoverFrequencyRange.value} Hz, ${crossoverSlopeSelect.value} dB/oct (${crossoverResponseSelect.value === 'lr24' ? 'Linkwitz-Riley 24' : 'Linkwitz-Riley 12'})`;
+      activeCrossover.textContent = `${crossoverFrequencyRange.value} Hz · ${crossoverResponseSelect.value === 'lr24' ? 'Linkwitz–Riley 24 dB/oct' : 'Linkwitz–Riley 12 dB/oct'}`;
       selectedSourceLabel.textContent = selectedSource !== null ? sources[selectedSource].label : 'None';
       fieldScale.textContent = comparisonModeSelect.value === 'same-total-source-power' ? 'normalized to total source power' : 'normalized to cabinet gain';
 
@@ -1040,7 +1107,7 @@
 
       if (displayMode === 'single') {
         sources.forEach((source, index) => {
-          const pos = worldToCanvas(source);
+          const pos = getSourceSymbolPosition(source);
           drawSourceSymbol(source, pos.x, pos.y, index);
         });
       }
@@ -1082,7 +1149,6 @@
       layoutSelect.value = '2.0';
       frequencyRange.value = 80;
       crossoverFrequencyRange.value = 80;
-      crossoverSlopeSelect.value = '24';
       crossoverResponseSelect.value = 'lr24';
       comparisonModeSelect.value = 'same-per-cabinet';
       modulationDurationRange.value = 16;
@@ -1165,7 +1231,6 @@
     layoutSelect.addEventListener('change', () => setLayout(layoutSelect.value));
     frequencyRange.addEventListener('input', render);
     crossoverFrequencyRange.addEventListener('input', render);
-    crossoverSlopeSelect.addEventListener('change', render);
     crossoverResponseSelect.addEventListener('change', render);
     comparisonModeSelect.addEventListener('change', render);
     analysisModeSelect.addEventListener('change', () => {
@@ -1200,7 +1265,7 @@
 
     function drawCompareSources(sourceList, offsetX, panelWidth) {
       sourceList.forEach((source, index) => {
-        const pos = worldToCanvas(source, panelWidth);
+        const pos = getSourceSymbolPosition(source, panelWidth);
         drawSourceSymbol(source, offsetX + pos.x, pos.y, index);
       });
     }
@@ -1211,10 +1276,49 @@
       requestAnimationFrame(animateLoop);
     }
 
+    function normalizePhaseDegrees(degrees) {
+      let normalized = degrees % 360;
+      if (normalized > 180) normalized -= 360;
+      if (normalized < -180) normalized += 360;
+      return normalized;
+    }
+
+    function getSourceDiagnostics(source, listenerX, listenerY, frequency, elapsedSeconds, normalizationScale = 1) {
+      const dx = listenerX - source.x;
+      const dy = listenerY - source.y;
+      const distance = Math.hypot(dx, dy);
+      const travelTimeMs = (distance / SPEED_OF_SOUND) * 1000;
+      const propagationPhaseRadians = 2 * Math.PI * frequency * (distance / SPEED_OF_SOUND);
+      const delayPhaseRadians = 2 * Math.PI * frequency * (source.delay / 1000);
+      const crossover = getComplexCrossoverResponse(source.type, frequency);
+      const basePhaseRadians = phaseComplex(complexFromPolar(1, source.phaseOffsetDegrees * Math.PI / 180));
+      const animated = getAnimatedValues(source, elapsedSeconds);
+      const animatedPhaseRadians = animated.phaseDegrees * Math.PI / 180;
+      const polarityPhaseDegrees = source.polarity < 0 ? 180 : 0;
+      const effectivePhaseRadians = propagationPhaseRadians + delayPhaseRadians + crossover.phaseRadians + basePhaseRadians + animatedPhaseRadians + (source.polarity < 0 ? Math.PI : 0);
+      const contribution = getSourceContribution(source, listenerX, listenerY, frequency, elapsedSeconds, normalizationScale);
+      const amplitude = contribution.amplitude;
+      const levelDb = 20 * Math.log10(amplitude + 1e-6);
+      return {
+        distance,
+        travelTimeMs,
+        propagationPhaseDegrees: normalizePhaseDegrees(propagationPhaseRadians * 180 / Math.PI),
+        delayPhaseDegrees: normalizePhaseDegrees(delayPhaseRadians * 180 / Math.PI),
+        crossoverPhaseDegrees: normalizePhaseDegrees(crossover.phaseDegrees),
+        basePhaseDegrees: normalizePhaseDegrees(source.phaseOffsetDegrees),
+        animatedPhaseDegrees: normalizePhaseDegrees(animated.phaseDegrees),
+        polarityPhaseDegrees: polarityPhaseDegrees,
+        effectivePhaseDegrees: normalizePhaseDegrees(effectivePhaseRadians * 180 / Math.PI),
+        amplitude,
+        levelDb
+      };
+    }
+
     function renderListenerInfo(elapsedSeconds) {
       listenerPositionLabel.textContent = `${listener.x.toFixed(1)}, ${listener.y.toFixed(1)} m`;
       const frequencies = getActiveFrequencies();
       const displayFrequency = getActiveFrequency();
+      const layoutName = displayModeSelect.value === 'single' ? currentLayoutName : '2.0 vs 2.1';
       if (displayModeSelect.value === 'compare' || displayModeSelect.value === 'difference') {
         const leftSources = layoutStates['2.0'];
         const rightSources = layoutStates['2.1'];
@@ -1235,24 +1339,38 @@
       }
       listenerSourceTable.innerHTML = '';
 
-      const activeSources = displayModeSelect.value === 'single' ? sources : sources;
-      activeSources.forEach(source => {
-        const dx = listener.x - source.x;
-        const dy = listener.y - source.y;
-        const distance = Math.hypot(dx, dy);
-        const timeMs = (distance / SPEED_OF_SOUND) * 1000;
-        const phase = (2 * Math.PI * displayFrequency * (distance / SPEED_OF_SOUND + source.delay / 1000)) % (2 * Math.PI);
-        const contribution = getSourceContribution(source, listener.x, listener.y, displayFrequency, elapsedSeconds);
-        const level = 20 * Math.log10(contribution.amplitude + 1e-6);
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${source.label}</td>
-          <td>${distance.toFixed(1)} m</td>
-          <td>${timeMs.toFixed(1)} ms</td>
-          <td>${(phase * 180 / Math.PI).toFixed(1)}°</td>
-          <td>${level.toFixed(1)} dB</td>
-        `;
-        listenerSourceTable.appendChild(row);
+      const sections = displayModeSelect.value === 'single'
+        ? [{ layout: currentLayoutName, sources }]
+        : [{ layout: '2.0', sources: layoutStates['2.0'] }, { layout: '2.1', sources: layoutStates['2.1'] }];
+      const diagnosticLabel = analysisModeSelect.value === 'broadband' ? 'Broadband map uses multiple frequencies. Source phase diagnostics are shown at 80 Hz.' : '';
+      if (diagnosticLabel) {
+        const diagnosticNote = document.createElement('tr');
+        diagnosticNote.innerHTML = `<td colspan="11">${diagnosticLabel}</td>`;
+        listenerSourceTable.appendChild(diagnosticNote);
+      }
+
+      sections.forEach(section => {
+        const sectionHeader = document.createElement('tr');
+        sectionHeader.innerHTML = `<td colspan="11"><strong>${section.layout} source detail</strong></td>`;
+        listenerSourceTable.appendChild(sectionHeader);
+        section.sources.forEach(source => {
+          const diagnostics = getSourceDiagnostics(source, listener.x, listener.y, displayFrequency, elapsedSeconds);
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${section.layout}</td>
+            <td>${source.label}</td>
+            <td>${source.type}</td>
+            <td>${diagnostics.distance.toFixed(1)} m</td>
+            <td>${diagnostics.travelTimeMs.toFixed(1)} ms</td>
+            <td>${diagnostics.propagationPhaseDegrees.toFixed(1)}°</td>
+            <td>${diagnostics.crossoverPhaseDegrees.toFixed(1)}°</td>
+            <td>${diagnostics.basePhaseDegrees.toFixed(1)}°</td>
+            <td>${diagnostics.animatedPhaseDegrees.toFixed(1)}°</td>
+            <td>${diagnostics.effectivePhaseDegrees.toFixed(1)}°</td>
+            <td>${diagnostics.levelDb.toFixed(1)} dB</td>
+          `;
+          listenerSourceTable.appendChild(row);
+        });
       });
     }
 
@@ -1262,6 +1380,55 @@
     }
 
     initialize();
+
+    window.__soundfieldCrossoverTest = () => {
+      const cutoff = Number(crossoverFrequencyRange.value);
+      const ratios = [0.1, 0.25, 0.5, 1, 2, 4, 10];
+      const results = [];
+
+      const evaluatePair = (mode, frequency) => {
+        const previousMode = crossoverResponseSelect.value;
+        crossoverResponseSelect.value = mode;
+        const lp = getComplexCrossoverResponse('Sub', frequency);
+        const hp = getComplexCrossoverResponse('Top', frequency);
+        const compensatedHp = mode === 'lr12' ? scaleComplex(hp, -1) : hp;
+        const summed = addComplex(lp, compensatedHp);
+        const summedMagnitude = magnitudeComplex(summed);
+        const summedDb = 20 * Math.log10(summedMagnitude + 1e-9);
+        const row = {
+          mode,
+          frequencyRatio: frequency / cutoff,
+          frequency,
+          lpMagnitude: lp.magnitude,
+          hpMagnitude: hp.magnitude,
+          summedMagnitude,
+          summedDb,
+          lpPhase: lp.phaseDegrees,
+          hpPhase: hp.phaseDegrees,
+          phaseDifference: normalizePhaseDegrees(hp.phaseDegrees - lp.phaseDegrees)
+        };
+        crossoverResponseSelect.value = previousMode;
+        return row;
+      };
+
+      ['lr24', 'lr12'].forEach(mode => {
+        ratios.forEach(ratio => {
+          results.push(evaluatePair(mode, cutoff * ratio));
+        });
+      });
+
+      const lr24AtCutoff = evaluatePair('lr24', cutoff);
+      const lr12AtCutoff = evaluatePair('lr12', cutoff);
+      const summary = {
+        lr24AtCutoff,
+        lr12AtCutoff
+      };
+
+      console.table(results);
+      console.log('Crossover sanity checks', summary);
+      return { results, summary };
+    };
+
     window.__soundfieldDebug = () => {
       const durationSeconds = getAnimationDurationSeconds();
       console.log('v0.3.1 debug', {
