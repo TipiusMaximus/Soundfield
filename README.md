@@ -1,4 +1,4 @@
-# Pressure Field Lab v0.3
+# Pressure Field Lab v0.3.1
 
 A lightweight browser-based field lab for low-frequency speaker layout and crossover exploration. This version adds a more balanced 2.0 vs 2.1 comparison, a simplified complex crossover response, per-source phase offset, and source-specific modulation targets.
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pressure Field Lab v0.2</title>
+  <title>Pressure Field Lab v0.3.1</title>
   <style>
     :root {
       font-family: system-ui, sans-serif;
@@ -274,7 +274,7 @@
 </head>
 <body>
   <aside class="panel">
-    <h1>Pressure Field Lab v0.3</h1>
+    <h1>Pressure Field Lab v0.3.1</h1>
     <p>Explore low-frequency pressure and phase behavior in simple point-source speaker layouts. Drag sources and the listener, then compare 2.0 versus 2.1 field behavior with a simplified complex crossover and phase modulation.</p>
 
     <div class="section-title">Analysis</div>
@@ -606,6 +606,12 @@
       return analysisModeSelect.value === 'broadband'
         ? 'broadband'
         : `${frequencyRange.value} Hz`;
+    }
+
+    function getActiveFrequency() {
+      return analysisModeSelect.value === 'broadband'
+        ? BROADBAND_FREQUENCIES[0]
+        : Number(frequencyRange.value);
     }
 
     function getWavelength(frequency) {
@@ -1208,6 +1214,7 @@
     function renderListenerInfo(elapsedSeconds) {
       listenerPositionLabel.textContent = `${listener.x.toFixed(1)}, ${listener.y.toFixed(1)} m`;
       const frequencies = getActiveFrequencies();
+      const displayFrequency = getActiveFrequency();
       if (displayModeSelect.value === 'compare' || displayModeSelect.value === 'difference') {
         const leftSources = layoutStates['2.0'];
         const rightSources = layoutStates['2.1'];
@@ -1234,8 +1241,8 @@
         const dy = listener.y - source.y;
         const distance = Math.hypot(dx, dy);
         const timeMs = (distance / SPEED_OF_SOUND) * 1000;
-        const phase = (2 * Math.PI * Number(frequencyRange.value) * (distance / SPEED_OF_SOUND + source.delay / 1000)) % (2 * Math.PI);
-        const contribution = getSourceContribution(source, listener.x, listener.y, Number(frequencyRange.value), elapsedSeconds);
+        const phase = (2 * Math.PI * displayFrequency * (distance / SPEED_OF_SOUND + source.delay / 1000)) % (2 * Math.PI);
+        const contribution = getSourceContribution(source, listener.x, listener.y, displayFrequency, elapsedSeconds);
         const level = 20 * Math.log10(contribution.amplitude + 1e-6);
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -1257,7 +1264,7 @@
     initialize();
     window.__soundfieldDebug = () => {
       const durationSeconds = getAnimationDurationSeconds();
-      console.log('v0.3 debug', {
+      console.log('v0.3.1 debug', {
         durationSeconds,
         crossoverResponse: crossoverResponseSelect.value,
         modulationTargets: getModulationTargets(),
